@@ -1,5 +1,5 @@
 <?php
-// Query unread notif langsung di sidebar, tanpa perlu BaseController
+
 $unreadNotif = 0;
 if (session()->get('user_id')) {
     $notifModel = new \App\Models\NotificationModel();
