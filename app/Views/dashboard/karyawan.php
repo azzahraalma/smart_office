@@ -12,7 +12,7 @@ $today    = date('l, d F Y');
 $absenHariIni   = $absenHariIni   ?? null;
 $breakLogs      = $breakLogs      ?? [];
 $idleLogs       = $idleLogs       ?? [];
-$tasks          = $tasks          ?? [];
+$tasks = $taskList ?? [];
 $totalBreakMnt  = $totalBreakMnt  ?? 0;
 $sisaJamKerja   = $sisaJamKerja   ?? null;
 $taskSelesai    = $taskSelesai    ?? 0;
@@ -185,38 +185,6 @@ if ($jamMasuk) {
                     <div style="text-align:center;padding:24px 0;color:var(--text-muted);font-size:13px;">
                         <span class="material-icons-round" style="display:block;font-size:32px;margin-bottom:8px;color:var(--border);">calendar_today</span>
                         Belum ada aktivitas hari ini
-                    </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="mt-4 d-flex flex-column gap-2">
-                    <?php if (!$absenHariIni): ?>
-                    <a href="/absensi/masuk" class="btn-so-success" style="justify-content:center;">
-                        <span class="material-icons-round" style="font-size:18px;">login</span>
-                        Absen Masuk
-                    </a>
-                    <?php elseif (!$absenHariIni['jam_keluar']): ?>
-                        <?php if ($isBreak): ?>
-                        <a href="/break/selesai" class="btn-so-primary" style="justify-content:center;">
-                            <span class="material-icons-round" style="font-size:18px;">play_circle</span>
-                            Selesai Break
-                        </a>
-                        <?php else: ?>
-                        <a href="/break/mulai" class="btn-so-outline" style="justify-content:center;">
-                            <span class="material-icons-round" style="font-size:18px;">free_breakfast</span>
-                            Mulai Break
-                        </a>
-                        <?php endif; ?>
-                        <a href="/absensi/pulang" class="btn-so-danger" style="justify-content:center;"
-                            onclick="return confirm('Yakin absen pulang sekarang?')">
-                            <span class="material-icons-round" style="font-size:18px;">logout</span>
-                            Absen Pulang
-                        </a>
-                    <?php else: ?>
-                    <div class="so-alert success" style="margin:0;">
-                        <span class="material-icons-round">check_circle</span>
-                        Sudah absen pulang pukul <?= date('H:i', strtotime($absenHariIni['jam_keluar'])) ?>
                     </div>
                     <?php endif; ?>
                 </div>

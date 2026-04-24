@@ -14,22 +14,23 @@ class User extends BaseController
         $this->userModel = new UserModel();
     }
 
-    // Daftar semua user — hanya admin
+    // ================= LIST USER =================
     public function index()
     {
         if (session()->get('role') !== 'manager') {
-            return redirect()->to('/')->with('error', 'Akses ditolak. Hanya manager yang bisa melihat halaman ini.');
+            return redirect()->to('/')->with('error', 'Akses ditolak.');
         }
 
-        $users = $this->userModel->orderBy('created_at', 'DESC')->findAll();
+        $users = $this->userModel
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
 
         return view('auth/users', [
-            'title' => 'Manajemen User',
-            'users' => $users,
+            'users' => $users ?? []
         ]);
     }
 
-    // Form edit user
+    // ================= EDIT =================
     public function edit($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -43,12 +44,11 @@ class User extends BaseController
         }
 
         return view('auth/edit', [
-            'title' => 'Edit User',
-            'user'  => $user,
+            'user' => $user
         ]);
     }
 
-    // Proses update user
+    // ================= UPDATE =================
     public function update($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -61,16 +61,6 @@ class User extends BaseController
             return redirect()->to('/users')->with('error', 'User tidak ditemukan.');
         }
 
-        $rules = [
-            'nama'  => 'required|min_length[3]',
-            'email' => "required|valid_email|is_unique[users.email,id,{$id}]",
-            'role'  => 'required|in_list[manager,karyawan]',
-        ];
-
-        if (!$this->validate($rules)) {
-            return redirect()->back()->withInput()->with('error', implode(' ', $this->validator->getErrors()));
-        }
-
         $data = [
             'nama'   => $this->request->getPost('nama'),
             'email'  => $this->request->getPost('email'),
@@ -78,47 +68,36 @@ class User extends BaseController
             'status' => $this->request->getPost('status'),
         ];
 
-        // Update password hanya kalau diisi
-        $passwordBaru = $this->request->getPost('password');
-        if (!empty($passwordBaru)) {
-            if (strlen($passwordBaru) < 6) {
-                return redirect()->back()->withInput()->with('error', 'Password minimal 6 karakter.');
-            }
-            $data['password'] = password_hash($passwordBaru, PASSWORD_DEFAULT);
+        // password optional
+        if ($this->request->getPost('password')) {
+            $data['password'] = password_hash(
+                $this->request->getPost('password'),
+                PASSWORD_DEFAULT
+            );
         }
 
-        // Update foto kalau ada file baru
-        $fileFoto = $this->request->getFile('foto');
-        if ($fileFoto && $fileFoto->isValid() && !$fileFoto->hasMoved()) {
-            $namaFoto = $fileFoto->getRandomName();
-            $fileFoto->move(ROOTPATH . 'public/uploads/foto', $namaFoto);
+        // upload foto
+        $file = $this->request->getFile('foto');
+        if ($file && $file->isValid() && !$file->hasMoved()) {
+            $namaFoto = $file->getRandomName();
+            $file->move(ROOTPATH . 'public/uploads/foto', $namaFoto);
             $data['foto'] = $namaFoto;
         }
 
         $this->userModel->update($id, $data);
 
-        // Kalau yang diedit adalah diri sendiri, update session juga
-        if (session()->get('user_id') == $id) {
-            session()->set([
-                'nama'  => $data['nama'],
-                'email' => $data['email'],
-                'role'  => $data['role'],
-            ]);
-        }
-
-        return redirect()->to('/users')->with('success', 'Data user berhasil diperbarui.');
+        return redirect()->to('/users')->with('success', 'User berhasil diupdate');
     }
 
-    // Toggle status aktif/nonaktif
+    // ================= TOGGLE =================
     public function toggleStatus($id)
     {
         if (session()->get('role') !== 'manager') {
             return redirect()->to('/')->with('error', 'Akses ditolak.');
         }
 
-        // Manager tidak bisa nonaktifkan dirinya sendiri
         if (session()->get('user_id') == $id) {
-            return redirect()->to('/users')->with('error', 'Kamu tidak bisa menonaktifkan akun sendiri.');
+            return redirect()->to('/users')->with('error', 'Tidak bisa ubah akun sendiri.');
         }
 
         $user = $this->userModel->find($id);
@@ -128,12 +107,15 @@ class User extends BaseController
         }
 
         $statusBaru = ($user['status'] === 'aktif') ? 'nonaktif' : 'aktif';
-        $this->userModel->update($id, ['status' => $statusBaru]);
 
-        return redirect()->to('/users')->with('success', 'Status user berhasil diubah menjadi ' . $statusBaru . '.');
+        $this->userModel->update($id, [
+            'status' => $statusBaru
+        ]);
+
+        return redirect()->to('/users')->with('success', 'Status berhasil diubah');
     }
 
-    // Hapus user
+    // ================= DELETE =================
     public function delete($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -141,11 +123,11 @@ class User extends BaseController
         }
 
         if (session()->get('user_id') == $id) {
-            return redirect()->to('/users')->with('error', 'Kamu tidak bisa menghapus akun sendiri.');
+            return redirect()->to('/users')->with('error', 'Tidak bisa hapus akun sendiri.');
         }
 
         $this->userModel->delete($id);
 
-        return redirect()->to('/users')->with('success', 'User berhasil dihapus.');
+        return redirect()->to('/users')->with('success', 'User berhasil dihapus');
     }
 }

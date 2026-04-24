@@ -93,7 +93,7 @@ $statusHadir  = $statusHadir     ?? ['hadir'=>0,'telat'=>0,'izin'=>0,'alpha'=>0]
                 <div class="chart-bar-wrap" id="barChart">
                     <?php
                     $days  = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
-                    $vals  = [38,35,42,39,44,12,8];
+                    $vals = $chartHadir;
                     $maxV  = max($vals) ?: 1;
                     foreach ($days as $i => $d):
                         $pct = round(($vals[$i] / $maxV) * 100);
@@ -125,7 +125,7 @@ $statusHadir  = $statusHadir     ?? ['hadir'=>0,'telat'=>0,'izin'=>0,'alpha'=>0]
                             <?php
                             $total = max(1, array_sum($statusHadir));
                             $colors = ['#10b981','#f59e0b','#0ea5e9','#ef4444'];
-                            $labels = ['hadir','telat','izin','alpha'];
+                            $labels = ['hadir','telat', 'izin',];
                             $circumference = 2 * M_PI * 38;
                             $offset = 0;
                             foreach ($labels as $li => $lbl):

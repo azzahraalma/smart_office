@@ -14,6 +14,7 @@ class AbsensiModel extends Model
 
     protected $allowedFields = [
         'user_id',
+        'nama',
         'tanggal',
         'jam_masuk',
         'jam_keluar',
@@ -24,7 +25,11 @@ class AbsensiModel extends Model
         'latitude_masuk',
         'longitude_masuk',
         'latitude_keluar',
-        'longitude_keluar'
+        'longitude_keluar',
+        'approved_by',
+        'approved_at',
+        'approval_status',
+        'jenis'
     ];
 
     protected $useTimestamps = true;

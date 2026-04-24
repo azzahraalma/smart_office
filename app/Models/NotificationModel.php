@@ -15,8 +15,9 @@ class NotificationModel extends Model
         'judul',
         'pesan',
         'tipe',
-        'is_read'
+        'is_read',
+        'created_at',
+        'updated_at'
     ];
-
     protected $useTimestamps = true;
 }

@@ -18,12 +18,16 @@ class Absensi extends BaseController
         $this->absensiModel = new AbsensiModel();
     }
 
+    // ================= INDEX =================
     public function index()
     {
         $userId = session()->get('user_id');
+        $role   = session()->get('role');
 
-        if (!$userId) {
-            return redirect()->to('/login');
+        if (!$userId) return redirect()->to('/login');
+
+        if ($role === 'manager') {
+            return redirect()->to('/absensi/manager');
         }
 
         $absenHariIni = $this->absensiModel
@@ -36,215 +40,230 @@ class Absensi extends BaseController
         ]);
     }
 
+    // ================= RIWAYAT =================
+    public function riwayat()
+    {
+        $userId = session()->get('user_id');
+
+        $data = $this->absensiModel
+            ->where('user_id', $userId)
+            ->orderBy('tanggal', 'DESC')
+            ->findAll();
+
+        return view('absensi/riwayat', [
+            'riwayat' => $data
+        ]);
+    }
+
+    // ================= MANAGER =================
+    public function manager()
+    {
+        if (session()->get('role') !== 'manager') {
+            return redirect()->to('/absensi');
+        }
+
+        $bulan = $this->request->getGet('bulan') ?? date('Y-m');
+        $start = $bulan . '-01';
+        $end   = date('Y-m-t', strtotime($start));
+
+        // Ambil semua user buat mapping id → nama
+        $userModel = new \App\Models\UserModel();
+        $users     = $userModel->findAll();
+        $userMap   = array_column($users, 'nama', 'id'); // [id => nama]
+
+        $data = $this->absensiModel
+            ->where('tanggal >=', $start)
+            ->where('tanggal <=', $end)
+            ->findAll();
+
+        $pending = $this->absensiModel
+            ->where('approval_status', 'pending')
+            ->findAll();
+
+        // SUMMARY
+        $summary = ['hadir' => 0, 'telat' => 0, 'izin' => 0, 'sakit' => 0];
+        foreach ($data as $d) {
+            if ($d['status'] === 'hadir') $summary['hadir']++;
+            elseif ($d['status'] === 'telat') $summary['telat']++;
+            elseif ($d['status'] === 'izin') {
+                if (($d['jenis'] ?? '') === 'sakit') $summary['sakit']++;
+                else $summary['izin']++;
+            }
+        }
+
+        // REKAP USER
+        $rekapUser = [];
+        foreach ($data as $d) {
+            $uid = $d['user_id'];
+            if (!isset($rekapUser[$uid])) {
+                $rekapUser[$uid] = ['hadir' => 0, 'telat' => 0, 'izin' => 0, 'sakit' => 0];
+            }
+            if ($d['status'] === 'hadir') $rekapUser[$uid]['hadir']++;
+            elseif ($d['status'] === 'telat') $rekapUser[$uid]['telat']++;
+            elseif ($d['status'] === 'izin') {
+                if (($d['jenis'] ?? '') === 'sakit') $rekapUser[$uid]['sakit']++;
+                else $rekapUser[$uid]['izin']++;
+            }
+        }
+
+        // CHART
+        $chart = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $tgl   = date('Y-m-d', strtotime("-$i days"));
+            $count = 0;
+            foreach ($data as $d) {
+                if ($d['tanggal'] == $tgl && in_array($d['status'], ['hadir', 'telat'])) {
+                    $count++;
+                }
+            }
+            $chart[] = $count;
+        }
+
+        return view('absensi/manager', [
+            'dataAbsensi' => $data,
+            'pending'     => $pending,
+            'summary'     => $summary,
+            'rekapUser'   => $rekapUser,
+            'chart'       => $chart,
+            'bulan'       => $bulan,
+            'userMap'     => $userMap, // ← tambah ini
+        ]);
+    }
+
+    // ================= ABSEN MASUK =================
     public function absenMasuk()
     {
         $userId = session()->get('user_id');
 
-        if (!$userId) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Sesi berakhir, silakan login ulang']);
-        }
-
-        $kantor  = $this->kantorModel->first();
-        $userLat = $this->request->getPost('latitude');
-        $userLng = $this->request->getPost('longitude');
-        $userIp  = $this->request->getIPAddress();
-
-        // 1. VALIDASI JARAK
-        $jarak = $this->hitungJarak($userLat, $userLng, $kantor['latitude'], $kantor['longitude']);
-        if ($jarak > $kantor['radius_meter']) {
-            return $this->response->setJSON([
-                'status'  => false,
-                'message' => 'Di luar area kantor (Jarak: ' . round($jarak) . 'm)'
-            ]);
-        }
-
-        // 2. VALIDASI IP
-        if (!$this->isIpAllowed($userIp, $kantor['allowed_ip'])) {
-            return $this->response->setJSON([
-                'status'  => false,
-                'message' => 'IP tidak diizinkan. IP Anda: ' . $userIp
-            ]);
-        }
-
-        // 3. CEK DOUBLE ABSEN
-        $sudahAbsen = $this->absensiModel
+        $cek = $this->absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
             ->first();
 
-        if ($sudahAbsen) {
-            return $this->response->setJSON([
-                'status'  => false,
-                'message' => 'Kamu sudah absen masuk hari ini'
-            ]);
-        }
+        if ($cek) return $this->res(false, 'Sudah absen');
 
-        $sekarang = date('H:i:s');
-        $status   = ($sekarang > $kantor['jam_masuk']) ? 'telat' : 'hadir';
+        $jam = date('H:i:s');
 
         $this->absensiModel->insert([
             'user_id'         => $userId,
             'tanggal'         => date('Y-m-d'),
-            'jam_masuk'       => $sekarang,
-            'status'          => $status,
-            'latitude_masuk'  => $userLat,
-            'longitude_masuk' => $userLng
+            'jam_masuk'       => $jam,
+            'status'          => 'hadir',
+            'approval_status' => 'approved'
         ]);
 
-        // 🔔 TRIGGER NOTIFIKASI ABSEN MASUK
-        NotificationHelper::absenMasuk($userId, $sekarang, $status);
+        NotificationHelper::absenMasuk($userId, $jam, 'hadir');
 
-        return $this->createResponse(true, 'Absen masuk berhasil', round($jarak), $status);
+        return $this->res(true, 'Absen masuk berhasil');
     }
 
+    // ================= ABSEN PULANG =================
     public function absenPulang()
     {
         $userId = session()->get('user_id');
 
-        if (!$userId) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Sesi tidak valid']);
-        }
-
-        $kantor  = $this->kantorModel->first();
-        $userLat = $this->request->getPost('latitude');
-        $userLng = $this->request->getPost('longitude');
-        $userIp  = $this->request->getIPAddress();
-
-        $absenHariIni = $this->absensiModel
+        $data = $this->absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
             ->first();
 
-        if (!$absenHariIni) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Belum absen masuk']);
-        }
+        if (!$data) return $this->res(false, 'Belum absen masuk');
 
-        if (!empty($absenHariIni['jam_keluar'])) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Sudah absen pulang']);
-        }
-
-        // VALIDASI JARAK & IP PULANG
-        $jarak = $this->hitungJarak($userLat, $userLng, $kantor['latitude'], $kantor['longitude']);
-        if ($jarak > $kantor['radius_meter'] || !$this->isIpAllowed($userIp, $kantor['allowed_ip'])) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Gagal: Pastikan Anda di kantor dan jaringan benar']);
-        }
-
-        $jamKeluar = date('H:i:s');
-
-        $this->absensiModel->update($absenHariIni['id'], [
-            'jam_keluar'       => $jamKeluar,
-            'latitude_keluar'  => $userLat,
-            'longitude_keluar' => $userLng
+        $this->absensiModel->update($data['id'], [
+            'jam_keluar' => date('H:i:s')
         ]);
 
-        // 🔔 TRIGGER NOTIFIKASI ABSEN PULANG
-        NotificationHelper::absenPulang($userId, $jamKeluar);
+        NotificationHelper::absenPulang($userId, date('H:i:s'));
 
-        return $this->response->setJSON(['status' => true, 'message' => 'Absen pulang berhasil']);
+        return $this->res(true, 'Absen pulang berhasil');
     }
 
-    // ─────────────────────────────────────────────
-    // BREAK (tambahan method)
-    // ─────────────────────────────────────────────
-
-    public function breakMulai()
+    // ================= IZIN =================
+    public function izin()
     {
         $userId = session()->get('user_id');
+        $jenis  = $this->request->getPost('jenis');
+        $ket    = $this->request->getPost('keterangan');
 
-        if (!$userId) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Sesi tidak valid']);
-        }
-
-        $absenHariIni = $this->absensiModel
-            ->where('user_id', $userId)
-            ->where('tanggal', date('Y-m-d'))
-            ->first();
-
-        if (!$absenHariIni) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Kamu belum absen masuk']);
-        }
-
-        if (!empty($absenHariIni['break_mulai']) && empty($absenHariIni['break_selesai'])) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Kamu sedang dalam break']);
-        }
-
-        $jamBreak = date('H:i:s');
-
-        $this->absensiModel->update($absenHariIni['id'], [
-            'break_mulai'   => $jamBreak,
-            'break_selesai' => null,
+        $this->absensiModel->insert([
+            'user_id'         => $userId,
+            'tanggal'         => date('Y-m-d'),
+            'status'          => 'izin',
+            'jenis'           => $jenis,
+            'keterangan'      => $ket,
+            'approval_status' => 'pending'
         ]);
 
-        // 🔔 TRIGGER NOTIFIKASI BREAK MULAI
-        NotificationHelper::breakMulai($userId, $jamBreak);
+        NotificationHelper::izinRequest($userId, $jenis, $ket);
 
-        return $this->response->setJSON(['status' => true, 'message' => 'Break dimulai pukul ' . $jamBreak]);
+        return $this->res(true, 'Pengajuan dikirim');
     }
 
-    public function breakSelesai()
+    // ================= APPROVE =================
+    public function approve($id)
     {
-        $userId = session()->get('user_id');
-
-        if (!$userId) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Sesi tidak valid']);
+        if (session()->get('role') !== 'manager') {
+            return redirect()->to('/absensi');
         }
 
-        $absenHariIni = $this->absensiModel
-            ->where('user_id', $userId)
-            ->where('tanggal', date('Y-m-d'))
-            ->first();
-
-        if (!$absenHariIni || empty($absenHariIni['break_mulai'])) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Kamu belum mulai break']);
+        $data = $this->absensiModel->find($id);
+        if (!$data) {
+            return redirect()->back()->with('error', 'Data tidak ditemukan');
         }
 
-        if (!empty($absenHariIni['break_selesai'])) {
-            return $this->response->setJSON(['status' => false, 'message' => 'Break sudah selesai']);
-        }
-
-        $jamSelesai  = date('H:i:s');
-        $durasiMenit = (int) floor((strtotime($jamSelesai) - strtotime($absenHariIni['break_mulai'])) / 60);
-
-        $this->absensiModel->update($absenHariIni['id'], [
-            'break_selesai' => $jamSelesai,
-            'durasi_break'  => $durasiMenit,
+        $this->absensiModel->update($id, [
+            'approval_status' => 'approved',
+            'approved_by'     => session()->get('user_id'),
+            'approved_at'     => date('Y-m-d H:i:s')
         ]);
 
-        // 🔔 TRIGGER NOTIFIKASI BREAK SELESAI
-        NotificationHelper::breakSelesai($userId, $jamSelesai, $durasiMenit);
+        NotificationHelper::izinApproved($data['user_id'], $data['jenis'] ?? 'izin');
 
-        return $this->response->setJSON(['status' => true, 'message' => "Break selesai. Durasi: {$durasiMenit} menit"]);
+        return redirect()->to('/absensi/manager')->with('success', 'Pengajuan disetujui ✅');
     }
 
-    // ─────────────────────────────────────────────
-    // HELPERS
-    // ─────────────────────────────────────────────
-
-    private function isIpAllowed($currentIp, $allowedIpsString)
+    // ================= REJECT =================
+    public function reject($id)
     {
-        if (empty($allowedIpsString)) return true;
-        $allowedIps = array_map('trim', explode(',', $allowedIpsString));
-        return in_array($currentIp, $allowedIps);
+        if (session()->get('role') !== 'manager') {
+            return redirect()->to('/absensi');
+        }
+
+        $data = $this->absensiModel->find($id);
+        if (!$data) {
+            return redirect()->back()->with('error', 'Data tidak ditemukan');
+        }
+
+        $this->absensiModel->update($id, [
+            'approval_status' => 'rejected',
+            'approved_by'     => session()->get('user_id'),
+            'approved_at'     => date('Y-m-d H:i:s')
+        ]);
+
+        NotificationHelper::izinRejected($data['user_id'], $data['jenis'] ?? 'izin');
+
+        return redirect()->to('/absensi/manager')->with('success', 'Pengajuan ditolak ❌');
+    }
+
+    // ================= HELPER =================
+    private function res($s, $m)
+    {
+        return $this->response->setJSON([
+            'status'  => $s,
+            'message' => $m
+        ]);
     }
 
     private function hitungJarak($lat1, $lon1, $lat2, $lon2)
     {
-        $earthRadius = 6371000;
+        $R    = 6371000;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat / 2) * sin($dLat / 2)
-            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-            * sin($dLon / 2) * sin($dLon / 2);
-        return $earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a)));
-    }
 
-    private function createResponse($status, $msg, $jarak = null, $kehadiran = null)
-    {
-        return $this->response->setJSON([
-            'status'            => $status,
-            'message'           => $msg,
-            'jarak_meter'       => $jarak,
-            'status_kehadiran'  => $kehadiran
-        ]);
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLon / 2) * sin($dLon / 2);
+
+        return $R * (2 * atan2(sqrt($a), sqrt(1 - $a)));
     }
 }

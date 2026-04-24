@@ -25,6 +25,7 @@ class NotificationHelper
                 'pesan'   => $pesan,
                 'tipe'    => $tipe,
                 'is_read' => 0,
+                'created_at' => date('Y-m-d H:i:s')
             ]);
         }
     }
@@ -35,14 +36,14 @@ class NotificationHelper
     public static function getManagerIds(): array
     {
         $db = \Config\Database::connect();
+
         $rows = $db->table('users')
-            ->where('role', 'manager')
+            ->like('role', 'manager') // 🔥 bukan where lagi
             ->get()
             ->getResultArray();
 
         return array_column($rows, 'id');
     }
-
     /**
      * Ambil nama user berdasarkan ID
      */
@@ -57,9 +58,6 @@ class NotificationHelper
     //  TASK
     // ─────────────────────────────────────────────
 
-    /**
-     * Notif ke karyawan saat dapat task baru
-     */
     public static function taskBaru(int $assignedTo, string $judulTask, ?string $deadline, string $prioritas): void
     {
         $deadlineLabel = $deadline ? date('d M Y, H:i', strtotime($deadline)) : 'Tidak ada deadline';
@@ -72,9 +70,6 @@ class NotificationHelper
         );
     }
 
-    /**
-     * Notif ke semua manager saat karyawan update status task
-     */
     public static function taskProgressUpdate(int $karyawanId, string $judulTask, string $statusBaru): void
     {
         $nama       = self::getUserName($karyawanId);
@@ -94,16 +89,12 @@ class NotificationHelper
         );
     }
 
-    /**
-     * Notif ke karyawan + manager saat task melewati deadline
-     */
     public static function taskTelat(int $assignedTo, string $judulTask, string $deadline): void
     {
         $deadlineLabel = date('d M Y, H:i', strtotime($deadline));
         $managerIds    = self::getManagerIds();
         $namaKaryawan  = self::getUserName($assignedTo);
 
-        // Notif ke karyawan
         self::send(
             $assignedTo,
             '🚨 Task Melewati Deadline!',
@@ -111,7 +102,6 @@ class NotificationHelper
             'task'
         );
 
-        // Notif ke semua manager
         self::send(
             $managerIds,
             '🚨 Task Telat Dikerjakan',
@@ -124,9 +114,6 @@ class NotificationHelper
     //  ABSENSI
     // ─────────────────────────────────────────────
 
-    /**
-     * Notif ke karyawan + manager saat absen masuk
-     */
     public static function absenMasuk(int $userId, string $jamMasuk, string $status): void
     {
         $nama        = self::getUserName($userId);
@@ -148,9 +135,6 @@ class NotificationHelper
         );
     }
 
-    /**
-     * Notif ke karyawan + manager saat absen pulang
-     */
     public static function absenPulang(int $userId, string $jamKeluar): void
     {
         $nama       = self::getUserName($userId);
@@ -236,6 +220,52 @@ class NotificationHelper
             '🔴 Idle Terdeteksi',
             "{$nama} tidak aktif selama {$durasiMenit} menit.",
             'idle'
+        );
+    }
+
+    // ─────────────────────────────────────────────
+    //  IZIN  ← semua pakai self::send() sekarang
+    // ─────────────────────────────────────────────
+
+    public static function izinRequest(int $userId, string $jenis, string $ket): void
+    {
+        $nama       = self::getUserName($userId);
+        $managerIds = self::getManagerIds();
+
+        // Notif ke semua manager
+        self::send(
+            $managerIds,
+            '📋 Pengajuan ' . ucfirst($jenis),
+            "{$nama} mengajukan {$jenis}: {$ket}",
+            'absensi'
+        );
+
+        // Notif ke karyawan sendiri
+        self::send(
+            $userId,
+            '📨 Pengajuan Terkirim',
+            "Pengajuan {$jenis} kamu sudah dikirim ke manager. Tunggu konfirmasi ya!",
+            'absensi'
+        );
+    }
+
+    public static function izinApproved(int $userId, string $jenis): void
+    {
+        self::send(
+            $userId,
+            '✅ Pengajuan Disetujui',
+            "Pengajuan {$jenis} kamu telah disetujui oleh manager.",
+            'absensi'
+        );
+    }
+
+    public static function izinRejected(int $userId, string $jenis): void
+    {
+        self::send(
+            $userId,
+            '❌ Pengajuan Ditolak',
+            "Maaf, pengajuan {$jenis} kamu ditolak oleh manager.",
+            'absensi'
         );
     }
 }

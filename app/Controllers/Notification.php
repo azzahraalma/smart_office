@@ -57,4 +57,16 @@ class Notification extends BaseController
 
         return redirect()->back();
     }
+
+    // CLEAR SEMUA NOTIFIKASI
+    public function clear()
+    {
+        $userId = session()->get('user_id');
+
+        $this->notifModel
+            ->where('user_id', $userId)
+            ->delete();
+
+        return redirect()->back();
+    }
 }

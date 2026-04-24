@@ -15,12 +15,12 @@
 
 <!-- RINGKASAN STATISTIK -->
 <?php
-    $totalHadir = 0; $totalTelat = 0; $totalIzin = 0; $totalAlpha = 0;
+    $totalHadir = 0; $totalTelat = 0; $totalIzin = 0; $totalSakit = 0;
     foreach ($riwayat as $r) {
         if ($r['status'] === 'hadir')      $totalHadir++;
         elseif ($r['status'] === 'telat')  $totalTelat++;
         elseif ($r['status'] === 'izin')   $totalIzin++;
-        elseif ($r['status'] === 'alpha')  $totalAlpha++;
+        elseif ($r['status'] === 'sakit')  $totalSakit++;
     }
     $total = count($riwayat);
 ?>
@@ -53,8 +53,8 @@
     <div class="col-6 col-lg-3">
         <div class="stat-card primary">
             <div class="stat-card-icon primary"><span class="material-icons-round">cancel</span></div>
-            <div class="stat-card-label">Alpha</div>
-            <div class="stat-card-value"><?= $totalAlpha ?></div>
+            <div class="stat-card-label">Sakit</div>
+            <div class="stat-card-value"><?= $totalSakit ?></div>
             <div class="stat-card-sub">hari</div>
         </div>
     </div>
@@ -122,7 +122,7 @@
                         }
                     }
 
-                    $badgeMap = ['hadir'=>'hadir','telat'=>'telat','izin'=>'izin','alpha'=>'absen'];
+                    $badgeMap = ['hadir'=>'hadir','telat'=>'telat','izin'=>'izin','sakit'=>'absen'];
                     $badge    = $badgeMap[$r['status']] ?? 'todo';
                     $bln      = date('Y-m', strtotime($tgl));
                 ?>

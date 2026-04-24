@@ -2,36 +2,40 @@
 <?= $this->section('content') ?>
 
 <?php
-// Helper: icon & warna berdasarkan tipe notif
-function notifIcon(string $tipe): string {
+function notifIcon(?string $tipe): string {
+    $tipe = $tipe ?? 'default';
     return match($tipe) {
-        'task'   => '📋',
-        'absen'  => '🕐',
-        'idle'   => '😴',
-        'break'  => '☕',
-        default  => '🔔',
+        'task'    => '📋',
+        'absen'   => '🕐',
+        'absensi' => '🕐',
+        'idle'    => '😴',
+        'break'   => '☕',
+        default   => '🔔',
     };
 }
-function notifColor(string $tipe): string {
+function notifColor(?string $tipe): string {
+    $tipe = $tipe ?? 'default';
     return match($tipe) {
-        'task'   => '#3b82f6',
-        'absen'  => '#10b981',
-        'idle'   => '#f59e0b',
-        'break'  => '#8b5cf6',
-        default  => '#6b7280',
+        'task'    => '#3b82f6',
+        'absen'   => '#10b981',
+        'absensi' => '#10b981',
+        'idle'    => '#f59e0b',
+        'break'   => '#8b5cf6',
+        default   => '#6b7280',
     };
 }
-function notifBg(string $tipe): string {
+function notifBg(?string $tipe): string {
+    $tipe = $tipe ?? 'default';
     return match($tipe) {
-        'task'   => '#eff6ff',
-        'absen'  => '#f0fdf4',
-        'idle'   => '#fffbeb',
-        'break'  => '#f5f3ff',
-        default  => '#f9fafb',
+        'task'    => '#eff6ff',
+        'absen'   => '#f0fdf4',
+        'absensi' => '#f0fdf4',
+        'idle'    => '#fffbeb',
+        'break'   => '#f5f3ff',
+        default   => '#f9fafb',
     };
 }
 
-// Kelompokkan notif: hari ini vs sebelumnya
 $today  = [];
 $before = [];
 foreach ($notifications as $n) {
@@ -66,7 +70,6 @@ foreach ($notifications as $n) {
 <?php endif; ?>
 
 <?php if (empty($notifications)): ?>
-<!-- EMPTY STATE -->
 <div class="n-empty">
     <div style="font-size:52px;margin-bottom:12px;">🔔</div>
     <div style="font-weight:700;font-size:16px;margin-bottom:6px;">Belum ada notifikasi</div>
@@ -77,21 +80,18 @@ foreach ($notifications as $n) {
 
 <?php else: ?>
 
-<!-- HARI INI -->
 <?php if (!empty($today)): ?>
 <div class="n-section-label">Hari Ini</div>
 <?php foreach ($today as $n): ?>
 <div class="n-card <?= $n['is_read'] ? 'read' : 'unread' ?>"
-     style="--notif-color:<?= notifColor($n['tipe']) ?>;--notif-bg:<?= notifBg($n['tipe']) ?>;">
+     style="--notif-color:<?= notifColor($n['tipe'] ?? null) ?>;--notif-bg:<?= notifBg($n['tipe'] ?? null) ?>;">
     <div class="n-icon-wrap">
-        <?= notifIcon($n['tipe']) ?>
+        <?= notifIcon($n['tipe'] ?? null) ?>
     </div>
     <div class="n-body">
         <div class="n-title"><?= esc($n['judul']) ?></div>
         <div class="n-pesan"><?= esc($n['pesan']) ?></div>
-        <div class="n-time">
-            <?= date('H:i', strtotime($n['created_at'])) ?> WIB
-        </div>
+        <div class="n-time"><?= date('H:i', strtotime($n['created_at'])) ?> WIB</div>
     </div>
     <?php if (!$n['is_read']): ?>
     <div class="n-dot"></div>
@@ -100,21 +100,18 @@ foreach ($notifications as $n) {
 <?php endforeach; ?>
 <?php endif; ?>
 
-<!-- SEBELUMNYA -->
 <?php if (!empty($before)): ?>
 <div class="n-section-label" style="margin-top:24px;">Sebelumnya</div>
 <?php foreach ($before as $n): ?>
 <div class="n-card <?= $n['is_read'] ? 'read' : 'unread' ?>"
-     style="--notif-color:<?= notifColor($n['tipe']) ?>;--notif-bg:<?= notifBg($n['tipe']) ?>;">
+     style="--notif-color:<?= notifColor($n['tipe'] ?? null) ?>;--notif-bg:<?= notifBg($n['tipe'] ?? null) ?>;">
     <div class="n-icon-wrap">
-        <?= notifIcon($n['tipe']) ?>
+        <?= notifIcon($n['tipe'] ?? null) ?>
     </div>
     <div class="n-body">
         <div class="n-title"><?= esc($n['judul']) ?></div>
         <div class="n-pesan"><?= esc($n['pesan']) ?></div>
-        <div class="n-time">
-            <?= date('d M Y, H:i', strtotime($n['created_at'])) ?> WIB
-        </div>
+        <div class="n-time"><?= date('d M Y, H:i', strtotime($n['created_at'])) ?> WIB</div>
     </div>
     <?php if (!$n['is_read']): ?>
     <div class="n-dot"></div>
@@ -126,14 +123,11 @@ foreach ($notifications as $n) {
 <?php endif; ?>
 
 <style>
-/* EMPTY */
 .n-empty {
     text-align: center;
     padding: 80px 20px;
     color: var(--text-muted);
 }
-
-/* SECTION LABEL */
 .n-section-label {
     font-size: 12px;
     font-weight: 700;
@@ -142,8 +136,6 @@ foreach ($notifications as $n) {
     letter-spacing: .5px;
     margin-bottom: 10px;
 }
-
-/* CARD */
 .n-card {
     display: flex;
     align-items: flex-start;
@@ -165,8 +157,6 @@ foreach ($notifications as $n) {
     border-color: var(--notif-color);
     border-left-width: 4px;
 }
-
-/* ICON */
 .n-icon-wrap {
     width: 42px;
     height: 42px;
@@ -179,8 +169,6 @@ foreach ($notifications as $n) {
     font-size: 20px;
     flex-shrink: 0;
 }
-
-/* BODY */
 .n-body { flex: 1; min-width: 0; }
 .n-title {
     font-weight: 700;
@@ -198,8 +186,6 @@ foreach ($notifications as $n) {
     font-size: 11px;
     color: var(--text-muted);
 }
-
-/* UNREAD DOT */
 .n-dot {
     width: 9px;
     height: 9px;
