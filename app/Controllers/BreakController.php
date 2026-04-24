@@ -2,7 +2,9 @@
 
 namespace App\Controllers;
 
+use App\Controllers\BaseController;
 use App\Models\BreakLogModel;
+use App\Helpers\NotificationHelper;
 
 class BreakController extends BaseController
 {
@@ -15,30 +17,81 @@ class BreakController extends BaseController
 
     public function mulai()
     {
+        $userId = session()->get('user_id');
+
+        // Cek apakah sedang break
+        $aktif = $this->breakModel
+            ->where('user_id', $userId)
+            ->where('selesai', null)
+            ->first();
+
+        if ($aktif) {
+            return $this->response->setJSON([
+                'status'  => false,
+                'message' => 'Kamu sedang dalam break!'
+            ]);
+        }
+
+        $jam = date('Y-m-d H:i:s');
+
         $this->breakModel->insert([
-            'user_id' => 1,
-            'mulai' => date('Y-m-d H:i:s')
+            'user_id' => $userId,
+            'mulai'   => $jam,
         ]);
 
-        return redirect()->back()->with('success', 'Break dimulai');
+        NotificationHelper::breakMulai($userId, date('H:i', strtotime($jam)));
+
+        return $this->response->setJSON([
+            'status'  => true,
+            'message' => 'Break dimulai. Jangan lupa balik ya! ☕'
+        ]);
     }
 
     public function selesai()
     {
+        $userId = session()->get('user_id');
+
         $break = $this->breakModel
-            ->where('user_id', 1)
+            ->where('user_id', $userId)
             ->where('selesai', null)
             ->first();
 
-        if ($break) {
-            $durasi = floor((time() - strtotime($break['mulai'])) / 60);
-
-            $this->breakModel->update($break['id'], [
-                'selesai' => date('Y-m-d H:i:s'),
-                'durasi' => $durasi
+        if (!$break) {
+            return $this->response->setJSON([
+                'status'  => false,
+                'message' => 'Tidak ada break yang aktif.'
             ]);
         }
 
-        return redirect()->back()->with('success', 'Break selesai');
+        $selesai = date('Y-m-d H:i:s');
+        $durasi  = max(1, floor((time() - strtotime($break['mulai'])) / 60));
+
+        $this->breakModel->update($break['id'], [
+            'selesai' => $selesai,
+            'durasi'  => $durasi,
+        ]);
+
+        NotificationHelper::breakSelesai($userId, date('H:i', strtotime($selesai)), $durasi);
+
+        return $this->response->setJSON([
+            'status'  => true,
+            'message' => "Break selesai! Durasi: {$durasi} menit. Semangat! 💼"
+        ]);
+    }
+
+    // Cek status break aktif (untuk update UI)
+    public function status()
+    {
+        $userId = session()->get('user_id');
+
+        $aktif = $this->breakModel
+            ->where('user_id', $userId)
+            ->where('selesai', null)
+            ->first();
+
+        return $this->response->setJSON([
+            'sedang_break' => !empty($aktif),
+            'mulai'        => $aktif ? date('H:i', strtotime($aktif['mulai'])) : null,
+        ]);
     }
 }

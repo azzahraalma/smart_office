@@ -82,6 +82,21 @@
                     </button>
                 </div>
 
+                <!-- Tombol Break -->
+                <?php if ($absenHariIni && empty($absenHariIni['jam_keluar'])): ?>
+                <div style="margin-bottom:14px;">
+                    <button id="btn-break"
+                        onclick="toggleBreak()"
+                        class="btn-so-outline"
+                        style="width:100%;justify-content:center;padding:12px;font-size:14px;gap:8px;
+                            border-color:#f59e0b;color:#d97706;">
+                        <span class="material-icons-round" style="font-size:20px;" id="break-icon">free_breakfast</span>
+                        <span id="break-label">Mulai Break</span>
+                    </button>
+                    <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:6px;" id="break-info"></div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Hasil Absen -->
                 <div id="absen-result" class="so-alert d-none"></div>
 
@@ -395,6 +410,74 @@ function submitIzin() {
         btn.innerHTML = '<span class="material-icons-round" style="font-size:18px;">send</span> Kirim Pengajuan';
     });
 }
+
+// ── Break ────────────────────────────────────────
+let sedangBreak = false;
+
+// Cek status break saat halaman load
+fetch('/break/status')
+    .then(r => r.json())
+    .then(d => {
+        sedangBreak = d.sedang_break;
+        updateBreakUI();
+        if (d.sedang_break && d.mulai) {
+            document.getElementById('break-info').textContent = `Break dimulai pukul ${d.mulai}`;
+        }
+    });
+
+function updateBreakUI() {
+    const btn   = document.getElementById('btn-break');
+    const icon  = document.getElementById('break-icon');
+    const label = document.getElementById('break-label');
+    if (!btn) return;
+
+    if (sedangBreak) {
+        btn.style.borderColor    = '#ef4444';
+        btn.style.color          = '#ef4444';
+        btn.style.background     = '#fef2f2';
+        icon.textContent         = 'stop_circle';
+        label.textContent        = 'Selesai Break';
+    } else {
+        btn.style.borderColor    = '#f59e0b';
+        btn.style.color          = '#d97706';
+        btn.style.background     = '';
+        icon.textContent         = 'free_breakfast';
+        label.textContent        = 'Mulai Break';
+    }
+}
+
+    function toggleBreak() {
+        const url = sedangBreak ? '/break/selesai' : '/break/mulai';
+        const btn = document.getElementById('btn-break');
+        btn.disabled = true;
+
+        fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: ''
+        })
+        .then(r => r.json())
+        .then(d => {
+            showResult(d.status, d.message);
+            if (d.status) {
+                sedangBreak = !sedangBreak;
+                updateBreakUI();
+                const info = document.getElementById('break-info');
+                if (sedangBreak) {
+                    const now = new Date();
+                    info.textContent = `Break dimulai pukul ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                } else {
+                    info.textContent = '';
+                    setTimeout(() => location.reload(), 1800);
+                }
+            }
+            btn.disabled = false;
+        })
+        .catch(() => {
+            showResult(false, 'Gagal terhubung ke server.');
+            btn.disabled = false;
+        });
+    }
 </script>
 
 <?= $this->endSection() ?>

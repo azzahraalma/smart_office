@@ -6,6 +6,7 @@ use App\Models\AbsensiModel;
 use App\Models\TaskModel;
 use App\Models\UserModel;
 use App\Models\NotificationModel;
+use App\Models\BreakLogModel;
 
 class Dashboard extends BaseController
 {
@@ -18,12 +19,27 @@ class Dashboard extends BaseController
         $taskModel    = new TaskModel();
         $userModel    = new UserModel();
         $notifModel   = new NotificationModel();
+        $breakModel   = new BreakLogModel();
 
         // ================= ABSEN HARI INI =================
         $absenHariIni = $absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
             ->first();
+
+        // ================= BREAK =================
+        $breakLogs = $breakModel
+            ->where('user_id', $userId)
+            ->where('DATE(mulai)', date('Y-m-d'))
+            ->orderBy('mulai', 'ASC')
+            ->findAll();
+
+        $totalBreakMnt = array_sum(array_column($breakLogs, 'durasi'));
+
+        $isBreak = $breakModel
+            ->where('user_id', $userId)
+            ->where('selesai', null)
+            ->first() ? true : false;
 
         // ================= TASK =================
         if ($role === 'manager') {
@@ -68,29 +84,27 @@ class Dashboard extends BaseController
         // ================= HADIR HARI INI =================
         $hadirHariIni = $absensiModel
             ->where('tanggal', date('Y-m-d'))
-            ->whereIn('status', ['hadir','telat'])
+            ->whereIn('status', ['hadir', 'telat'])
             ->countAllResults();
 
         // ================= CHART 7 HARI =================
         $chartHadir = [];
         for ($i = 6; $i >= 0; $i--) {
             $tanggal = date('Y-m-d', strtotime("-$i days"));
-
-            $jumlah = $absensiModel
+            $jumlah  = $absensiModel
                 ->where('tanggal', $tanggal)
-                ->whereIn('status', ['hadir','telat'])
+                ->whereIn('status', ['hadir', 'telat'])
                 ->countAllResults();
-
             $chartHadir[] = $jumlah;
         }
 
         // ================= STATUS HADIR =================
         $statusHadir = [
-            'hadir' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status','hadir')->countAllResults(),
-            'telat' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status','telat')->countAllResults(),
-            'izin'  => $absensiModel->where('tanggal', date('Y-m-d'))->where('status','izin')->countAllResults(),
-            'sakit' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status','sakit')->countAllResults(),
-            'alpha' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status','alpha')->countAllResults(),
+            'hadir' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'hadir')->countAllResults(),
+            'telat' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'telat')->countAllResults(),
+            'izin'  => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'izin')->countAllResults(),
+            'sakit' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'sakit')->countAllResults(),
+            'alpha' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'alpha')->countAllResults(),
         ];
 
         // ================= ABSENSI TERBARU =================
@@ -109,24 +123,33 @@ class Dashboard extends BaseController
 
         // ================= PENDING IZIN (MANAGER) =================
         $pendingIzin = [];
-
         if ($role === 'manager') {
             $pendingIzin = $absensiModel
                 ->select('absensi.*, users.nama')
                 ->join('users', 'users.id = absensi.user_id')
-                ->where('absensi.status', 'pending')
-                ->where('absensi.tanggal', date('Y-m-d')) // ⬅️ penting
+                ->where('absensi.approval_status', 'pending')
                 ->orderBy('absensi.created_at', 'DESC')
                 ->findAll();
+        }
+
+        // ================= OVERTIME =================
+        $overtime = false;
+        if ($absenHariIni && empty($absenHariIni['jam_keluar'])) {
+            $overtime = time() > strtotime(date('Y-m-d') . ' 17:00:00');
         }
 
         // ================= DATA FINAL =================
         $data = [
             'absenHariIni'  => $absenHariIni,
+
+            'breakLogs'     => $breakLogs,
+            'totalBreakMnt' => $totalBreakMnt,
+            'isBreak'       => $isBreak,
+
             'taskAktif'     => $taskAktif,
             'taskSelesai'   => $taskSelesai,
             'taskList'      => $taskList,
-            'taskTotal'     => count($taskList),
+            'taskTotal'     => $taskAktif + $taskSelesai,
 
             'totalKaryawan' => $totalKaryawan,
             'hadirHariIni'  => $hadirHariIni,
@@ -135,7 +158,11 @@ class Dashboard extends BaseController
             'absensiList'   => $absensiList,
 
             'notifikasi'    => $notifikasi,
-            'pendingIzin'   => $pendingIzin
+            'pendingIzin'   => $pendingIzin,
+
+            'overtime'      => $overtime,
+            'isIdle'        => false,
+            'idleLogs'      => [],
         ];
 
         // ================= VIEW =================

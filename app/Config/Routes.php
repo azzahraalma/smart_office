@@ -9,7 +9,6 @@ $routes->get('/login',  'Auth::login');
 $routes->post('/login', 'Auth::loginProcess');
 $routes->get('/logout', 'Auth::logout');
 
-
 // ================= ROUTE LOGIN (semua user yg sudah login) =================
 $routes->group('', ['filter' => 'auth'], function ($routes) {
 
@@ -37,8 +36,9 @@ $routes->group('', ['filter' => 'auth'], function ($routes) {
     $routes->post('/idle/stop',  'Idle::stop');
 
     // Break
-    $routes->post('/break/mulai',   'BreakController::mulai');
-    $routes->post('/break/selesai', 'BreakController::selesai');
+    $routes->post('/break/mulai',    'BreakController::mulai');
+    $routes->post('/break/selesai',  'BreakController::selesai');
+    $routes->get('/break/status',    'BreakController::status'); // ← tambah ini
 
     // Task
     $routes->get('/task',               'Task::index');
