@@ -47,7 +47,6 @@
 
                 <!-- Tombol Absen Masuk & Pulang -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-
                     <button id="btn-masuk" class="btn-so-success"
                         onclick="doAbsen('masuk')"
                         style="justify-content:center;padding:16px;font-size:15px;flex-direction:column;gap:6px;"
@@ -69,7 +68,6 @@
                             <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_keluar'],0,5) ?></small>
                         <?php endif; ?>
                     </button>
-
                 </div>
 
                 <!-- Tombol Izin -->
@@ -88,8 +86,7 @@
                     <button id="btn-break"
                         onclick="toggleBreak()"
                         class="btn-so-outline"
-                        style="width:100%;justify-content:center;padding:12px;font-size:14px;gap:8px;
-                            border-color:#f59e0b;color:#d97706;">
+                        style="width:100%;justify-content:center;padding:12px;font-size:14px;gap:8px;border-color:#f59e0b;color:#d97706;">
                         <span class="material-icons-round" style="font-size:20px;" id="break-icon">free_breakfast</span>
                         <span id="break-label">Mulai Break</span>
                     </button>
@@ -121,23 +118,40 @@
             <div class="so-card-body">
 
                 <?php if ($absenHariIni): ?>
-                    <!-- Status Badge -->
                     <?php
                         $statusMap   = ['hadir'=>'hadir','telat'=>'telat','izin'=>'izin','sakit'=>'izin','alpha'=>'absen'];
                         $badge       = $statusMap[$absenHariIni['status']] ?? 'todo';
-                        $statusLabel = ['hadir'=>'Hadir Tepat Waktu','telat'=>'Terlambat','izin'=>'Izin','sakit'=>'Sakit','alpha'=>'Alpha'];
+                        $statusLabel = ['hadir'=>'Hadir Hari ini','telat'=>'Terlambat','izin'=>'Izin','sakit'=>'Sakit','alpha'=>'Alpha'];
                         $iconMap     = ['hadir'=>'check_circle','telat'=>'schedule','izin'=>'event_busy','sakit'=>'medical_services','alpha'=>'cancel'];
                         $colorBg     = ['hadir'=>'#d1fae5','telat'=>'#fef3c7','izin'=>'#dbeafe','sakit'=>'#dbeafe','alpha'=>'#fee2e2'];
                         $colorIcon   = ['hadir'=>'#059669','telat'=>'#d97706','izin'=>'#2563eb','sakit'=>'#2563eb','alpha'=>'#dc2626'];
+
+                        // Hitung durasi kerja
+                        $durasiKerja = null;
+                        if (!empty($absenHariIni['jam_masuk']) && !empty($absenHariIni['jam_keluar'])) {
+                            $diff = strtotime($absenHariIni['jam_keluar']) - strtotime($absenHariIni['jam_masuk']);
+                            if ($diff > 0) {
+                                $durasiKerja = floor($diff / 3600) . 'j ' . floor(($diff % 3600) / 60) . 'm';
+                            }
+                        }
+
+                        // Data overtime
+                        $isOt   = !empty($absenHariIni['is_overtime']);
+                        $otMnt  = (int)($absenHariIni['overtime_minutes'] ?? 0);
+                        $otJam  = floor($otMnt / 60);
+                        $otSisa = $otMnt % 60;
+                        $otLabel = $otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m";
                     ?>
-                    <div style="text-align:center;padding:20px 0 24px;">
-                        <div style="width:72px;height:72px;border-radius:20px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+
+                    <!-- Status icon & badge -->
+                    <div style="text-align:center;padding:16px 0 20px;">
+                        <div style="width:64px;height:64px;border-radius:18px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
                             background:<?= $colorBg[$absenHariIni['status']] ?? '#fee2e2' ?>;">
-                            <span class="material-icons-round" style="font-size:36px;color:<?= $colorIcon[$absenHariIni['status']] ?? '#dc2626' ?>;">
+                            <span class="material-icons-round" style="font-size:32px;color:<?= $colorIcon[$absenHariIni['status']] ?? '#dc2626' ?>;">
                                 <?= $iconMap[$absenHariIni['status']] ?? 'cancel' ?>
                             </span>
                         </div>
-                        <div style="font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px;">
+                        <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px;">
                             <?= $statusLabel[$absenHariIni['status']] ?? ucfirst($absenHariIni['status']) ?>
                         </div>
                         <span class="so-badge <?= $badge ?>"><?= ucfirst($absenHariIni['status']) ?></span>
@@ -145,26 +159,73 @@
 
                     <hr class="so-divider">
 
-                    <!-- Detail Waktu -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                        <div style="background:#f8faff;border-radius:10px;padding:14px;text-align:center;">
-                            <span class="material-icons-round" style="font-size:20px;color:var(--success);display:block;margin-bottom:6px;">login</span>
-                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Masuk</div>
-                            <div style="font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;">
+                    <!-- Jam Masuk & Pulang -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div style="background:#f8faff;border-radius:10px;padding:12px;text-align:center;">
+                            <span class="material-icons-round" style="font-size:18px;color:var(--success);display:block;margin-bottom:4px;">login</span>
+                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Masuk</div>
+                            <div style="font-size:18px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;">
                                 <?= ($absenHariIni['jam_masuk']) ? substr($absenHariIni['jam_masuk'],0,5) : '—' ?>
                             </div>
                         </div>
-                        <div style="background:#f8faff;border-radius:10px;padding:14px;text-align:center;">
-                            <span class="material-icons-round" style="font-size:20px;color:var(--danger);display:block;margin-bottom:6px;">logout</span>
-                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Pulang</div>
-                            <div style="font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;">
+                        <div style="background:#f8faff;border-radius:10px;padding:12px;text-align:center;">
+                            <span class="material-icons-round" style="font-size:18px;color:<?= $isOt ? '#ea580c' : 'var(--danger)' ?>;display:block;margin-bottom:4px;">logout</span>
+                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Pulang</div>
+                            <div style="font-size:18px;font-weight:800;color:<?= $isOt ? '#ea580c' : 'var(--text)' ?>;font-variant-numeric:tabular-nums;">
                                 <?= !empty($absenHariIni['jam_keluar']) ? substr($absenHariIni['jam_keluar'],0,5) : '—' ?>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Durasi Kerja & Overtime -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+
+                        <!-- Durasi Kerja -->
+                        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
+                            <span class="material-icons-round" style="font-size:18px;color:#16a34a;display:block;margin-bottom:4px;">timelapse</span>
+                            <div style="font-size:11px;color:#16a34a;font-weight:600;margin-bottom:2px;">Durasi Kerja</div>
+                            <div style="font-size:16px;font-weight:800;color:#15803d;">
+                                <?= $durasiKerja ?? '—' ?>
+                            </div>
+                            <?php if (!$durasiKerja && !empty($absenHariIni['jam_masuk']) && empty($absenHariIni['jam_keluar'])): ?>
+                                <div style="font-size:10px;color:#16a34a;margin-top:2px;">Sedang berjalan</div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Overtime -->
+                        <?php if ($isOt): ?>
+                        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;text-align:center;">
+                            <span class="material-icons-round" style="font-size:18px;color:#ea580c;display:block;margin-bottom:4px;">timer</span>
+                            <div style="font-size:11px;color:#ea580c;font-weight:600;margin-bottom:2px;">Overtime</div>
+                            <div style="font-size:16px;font-weight:800;color:#c2410c;"><?= $otLabel ?></div>
+                            <div style="font-size:10px;color:#9a3412;margin-top:2px;">Sudah tercatat</div>
+                        </div>
+                        <?php else: ?>
+                        <div style="background:#f8faff;border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;opacity:.6;">
+                            <span class="material-icons-round" style="font-size:18px;color:var(--text-muted);display:block;margin-bottom:4px;">timer_off</span>
+                            <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:2px;">Overtime</div>
+                            <div style="font-size:16px;font-weight:800;color:var(--text-muted);">—</div>
+                            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Tidak ada</div>
+                        </div>
+                        <?php endif; ?>
+
+                    </div>
+
+                    <!-- Banner overtime kalau ada -->
+                    <?php if ($isOt): ?>
+                    <div style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                        <span class="material-icons-round" style="font-size:20px;color:#ea580c;flex-shrink:0;">warning_amber</span>
+                        <div>
+                            <div style="font-size:12px;font-weight:700;color:#c2410c;">Overtime Tercatat</div>
+                            <div style="font-size:11px;color:#9a3412;margin-top:1px;">
+                                Kamu lembur <?= $otLabel ?> hari ini. Manager sudah mendapat notifikasi.
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
                     <?php if (!empty($absenHariIni['keterangan'])): ?>
-                        <div style="margin-top:16px;background:#f8faff;border-radius:10px;padding:12px 14px;">
+                        <div style="background:#f8faff;border-radius:10px;padding:12px 14px;">
                             <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Keterangan</div>
                             <div style="font-size:13px;color:var(--text);"><?= esc($absenHariIni['keterangan']) ?></div>
                         </div>
@@ -209,7 +270,6 @@
         <!-- Modal Body -->
         <div style="padding:24px;">
 
-            <!-- Jenis -->
             <div style="margin-bottom:18px;">
                 <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
                     Jenis Ketidakhadiran
@@ -238,7 +298,6 @@
                 </div>
             </div>
 
-            <!-- Keterangan -->
             <div style="margin-bottom:24px;">
                 <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
                     Keterangan <span style="color:var(--danger);">*</span>
@@ -253,20 +312,15 @@
                     onblur="this.style.borderColor='var(--border)'"></textarea>
             </div>
 
-            <!-- Action Buttons -->
             <div style="display:flex;gap:10px;">
-                <button onclick="closeIzinModal()" class="btn-so-outline" style="flex:1;justify-content:center;">
-                    Batal
-                </button>
+                <button onclick="closeIzinModal()" class="btn-so-outline" style="flex:1;justify-content:center;">Batal</button>
                 <button onclick="submitIzin()" id="btn-submit-izin" class="btn-so-primary" style="flex:2;justify-content:center;">
                     <span class="material-icons-round" style="font-size:18px;">send</span>
                     Kirim Pengajuan
                 </button>
             </div>
 
-            <!-- Alert result modal -->
             <div id="izin-result" class="so-alert d-none" style="margin-top:14px;"></div>
-
         </div>
     </div>
 </div>
@@ -346,8 +400,7 @@ function doAbsen(tipe) {
 
 // ── Modal Izin ───────────────────────────────────
 function openIzinModal() {
-    const modal = document.getElementById('izinModal');
-    modal.style.display = 'flex';
+    document.getElementById('izinModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
 function closeIzinModal() {
@@ -355,10 +408,8 @@ function closeIzinModal() {
     document.body.style.overflow = '';
     document.getElementById('ket').value = '';
     document.getElementById('izin-result').classList.add('d-none');
-    selectJenis('izin'); // reset ke izin
+    selectJenis('izin');
 }
-
-// Tutup modal kalau klik backdrop
 document.getElementById('izinModal').addEventListener('click', function(e) {
     if (e.target === this) closeIzinModal();
 });
@@ -368,22 +419,16 @@ function selectJenis(val) {
     document.getElementById('label-izin').style.borderColor  = isIzin ? 'var(--primary)' : 'var(--border)';
     document.getElementById('label-izin').style.background   = isIzin ? '#eff6ff' : '#f8faff';
     document.getElementById('label-izin').querySelector('.material-icons-round').style.color = isIzin ? 'var(--primary)' : 'var(--text-muted)';
-
     document.getElementById('label-sakit').style.borderColor = !isIzin ? 'var(--primary)' : 'var(--border)';
     document.getElementById('label-sakit').style.background  = !isIzin ? '#eff6ff' : '#f8faff';
     document.getElementById('label-sakit').querySelector('.material-icons-round').style.color = !isIzin ? 'var(--primary)' : 'var(--text-muted)';
-
     document.getElementById(isIzin ? 'radio-izin' : 'radio-sakit').checked = true;
 }
 
 function submitIzin() {
     const jenis = document.querySelector('input[name="jenis"]:checked').value;
     const ket   = document.getElementById('ket').value.trim();
-
-    if (!ket) {
-        showResult(false, 'Keterangan tidak boleh kosong.', 'izin-result');
-        return;
-    }
+    if (!ket) { showResult(false, 'Keterangan tidak boleh kosong.', 'izin-result'); return; }
 
     const btn = document.getElementById('btn-submit-izin');
     btn.disabled = true;
@@ -413,8 +458,6 @@ function submitIzin() {
 
 // ── Break ────────────────────────────────────────
 let sedangBreak = false;
-
-// Cek status break saat halaman load
 fetch('/break/status')
     .then(r => r.json())
     .then(d => {
@@ -430,54 +473,52 @@ function updateBreakUI() {
     const icon  = document.getElementById('break-icon');
     const label = document.getElementById('break-label');
     if (!btn) return;
-
     if (sedangBreak) {
-        btn.style.borderColor    = '#ef4444';
-        btn.style.color          = '#ef4444';
-        btn.style.background     = '#fef2f2';
-        icon.textContent         = 'stop_circle';
-        label.textContent        = 'Selesai Break';
+        btn.style.borderColor = '#ef4444';
+        btn.style.color       = '#ef4444';
+        btn.style.background  = '#fef2f2';
+        icon.textContent      = 'stop_circle';
+        label.textContent     = 'Selesai Break';
     } else {
-        btn.style.borderColor    = '#f59e0b';
-        btn.style.color          = '#d97706';
-        btn.style.background     = '';
-        icon.textContent         = 'free_breakfast';
-        label.textContent        = 'Mulai Break';
+        btn.style.borderColor = '#f59e0b';
+        btn.style.color       = '#d97706';
+        btn.style.background  = '';
+        icon.textContent      = 'free_breakfast';
+        label.textContent     = 'Mulai Break';
     }
 }
 
-    function toggleBreak() {
-        const url = sedangBreak ? '/break/selesai' : '/break/mulai';
-        const btn = document.getElementById('btn-break');
-        btn.disabled = true;
-
-        fetch(url, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: ''
-        })
-        .then(r => r.json())
-        .then(d => {
-            showResult(d.status, d.message);
-            if (d.status) {
-                sedangBreak = !sedangBreak;
-                updateBreakUI();
-                const info = document.getElementById('break-info');
-                if (sedangBreak) {
-                    const now = new Date();
-                    info.textContent = `Break dimulai pukul ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-                } else {
-                    info.textContent = '';
-                    setTimeout(() => location.reload(), 1800);
-                }
+function toggleBreak() {
+    const url = sedangBreak ? '/break/selesai' : '/break/mulai';
+    const btn = document.getElementById('btn-break');
+    btn.disabled = true;
+    fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: ''
+    })
+    .then(r => r.json())
+    .then(d => {
+        showResult(d.status, d.message);
+        if (d.status) {
+            sedangBreak = !sedangBreak;
+            updateBreakUI();
+            const info = document.getElementById('break-info');
+            if (sedangBreak) {
+                const now = new Date();
+                info.textContent = `Break dimulai pukul ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            } else {
+                info.textContent = '';
+                setTimeout(() => location.reload(), 1800);
             }
-            btn.disabled = false;
-        })
-        .catch(() => {
-            showResult(false, 'Gagal terhubung ke server.');
-            btn.disabled = false;
-        });
-    }
+        }
+        btn.disabled = false;
+    })
+    .catch(() => {
+        showResult(false, 'Gagal terhubung ke server.');
+        btn.disabled = false;
+    });
+}
 </script>
 
 <?= $this->endSection() ?>

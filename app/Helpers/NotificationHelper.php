@@ -20,12 +20,11 @@ class NotificationHelper
         foreach ($userIds as $uid) {
             if (!$uid) continue;
             $model->insert([
-                'user_id' => $uid,
-                'judul'   => $judul,
-                'pesan'   => $pesan,
-                'tipe'    => $tipe,
-                'is_read' => 0,
-                'created_at' => date('Y-m-d H:i:s')
+                'user_id'    => $uid,
+                'judul'      => $judul,
+                'pesan'      => $pesan,
+                'tipe'       => $tipe,
+                'is_read'    => 0,
             ]);
         }
     }
@@ -35,15 +34,15 @@ class NotificationHelper
      */
     public static function getManagerIds(): array
     {
-        $db = \Config\Database::connect();
-
+        $db   = \Config\Database::connect();
         $rows = $db->table('users')
-            ->like('role', 'manager') // 🔥 bukan where lagi
+            ->like('role', 'manager')
             ->get()
             ->getResultArray();
 
         return array_column($rows, 'id');
     }
+
     /**
      * Ambil nama user berdasarkan ID
      */
@@ -117,7 +116,7 @@ class NotificationHelper
     public static function absenMasuk(int $userId, string $jamMasuk, string $status): void
     {
         $nama        = self::getUserName($userId);
-        $labelStatus = $status === 'telat' ? '⚠️ Telat' : '✅ Tepat Waktu';
+        $labelStatus = $status === 'telat' ? '⚠️ Telat' : '✅ Tercatat';
         $managerIds  = self::getManagerIds();
 
         self::send(
@@ -152,6 +151,40 @@ class NotificationHelper
             '📍 Absen Pulang Karyawan',
             "{$nama} absen pulang pukul {$jamKeluar}.",
             'absensi'
+        );
+    }
+
+    /**
+     * Notifikasi overtime — dikirim ke karyawan & semua manager
+     * setelah karyawan absen pulang melebihi jam normal / 8 jam kerja
+     */
+    public static function overtime(int $userId, string $jamKeluar, int $overtimeMinutes): void
+    {
+        $nama       = self::getUserName($userId);
+        $managerIds = self::getManagerIds();
+
+        $jam = floor($overtimeMinutes / 60);
+        $mnt = $overtimeMinutes % 60;
+
+        // Format durasi: "1j 30m" atau "45m"
+        $durasiLabel = $jam > 0 ? "{$jam}j {$mnt}m" : "{$mnt} menit";
+
+        // Notif ke karyawan
+        self::send(
+            $userId,
+            '⏰ Kamu Overtime Hari Ini',
+            "Kamu absen pulang pukul {$jamKeluar} dan tercatat overtime selama {$durasiLabel}. "
+            . "Overtime kamu sudah dicatat dan akan diproses oleh manager.",
+            'overtime'
+        );
+
+        // Notif ke manager
+        self::send(
+            $managerIds,
+            '⚠️ Karyawan Overtime',
+            "{$nama} absen pulang pukul {$jamKeluar} dengan overtime {$durasiLabel}. "
+            . "Silakan cek dashboard untuk detail rekap overtime.",
+            'overtime'
         );
     }
 
@@ -224,7 +257,7 @@ class NotificationHelper
     }
 
     // ─────────────────────────────────────────────
-    //  IZIN  ← semua pakai self::send() sekarang
+    //  IZIN
     // ─────────────────────────────────────────────
 
     public static function izinRequest(int $userId, string $jenis, string $ket): void
@@ -232,7 +265,6 @@ class NotificationHelper
         $nama       = self::getUserName($userId);
         $managerIds = self::getManagerIds();
 
-        // Notif ke semua manager
         self::send(
             $managerIds,
             '📋 Pengajuan ' . ucfirst($jenis),
@@ -240,7 +272,6 @@ class NotificationHelper
             'absensi'
         );
 
-        // Notif ke karyawan sendiri
         self::send(
             $userId,
             '📨 Pengajuan Terkirim',

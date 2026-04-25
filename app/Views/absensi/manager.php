@@ -27,8 +27,8 @@
 </div>
 <?php endif; ?>
 
-<!-- SUMMARY CARDS -->
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;">
+<!-- SUMMARY CARDS — 5 kartu termasuk overtime -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;">
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px 20px;">
         <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Hadir</div>
         <div style="font-size:28px;font-weight:800;color:#15803d;"><?= $summary['hadir'] ?></div>
@@ -45,6 +45,11 @@
         <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sakit</div>
         <div style="font-size:28px;font-weight:800;color:#b91c1c;"><?= $summary['sakit'] ?></div>
     </div>
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:16px 20px;">
+        <div style="font-size:11px;font-weight:700;color:#ea580c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Overtime</div>
+        <div style="font-size:28px;font-weight:800;color:#c2410c;"><?= $summary['overtime'] ?></div>
+        <div style="font-size:11px;color:#9a3412;margin-top:2px;">kejadian</div>
+    </div>
 </div>
 
 <!-- CHART -->
@@ -53,7 +58,7 @@
     <canvas id="chart7hari" height="80"></canvas>
 </div>
 
-<!-- REKAP KARYAWAN -->
+<!-- REKAP KARYAWAN — dengan kolom overtime -->
 <div class="card" style="margin-bottom:20px;">
     <div style="font-weight:700;font-size:14px;margin-bottom:16px;">👥 Performa Karyawan — <?= date('F Y', strtotime($bulan . '-01')) ?></div>
 
@@ -68,11 +73,18 @@
                     <th style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✔ Hadir</th>
                     <th style="padding:10px 14px;text-align:center;color:#d97706;font-weight:600;">⏰ Telat</th>
                     <th style="padding:10px 14px;text-align:center;color:#2563eb;font-weight:600;">📌 Izin</th>
-                    <th style="padding:10px 14px;text-align:center;border-radius:0 8px 8px 0;color:#dc2626;font-weight:600;">🤒 Sakit</th>
+                    <th style="padding:10px 14px;text-align:center;color:#dc2626;font-weight:600;">🤒 Sakit</th>
+                    <th style="padding:10px 14px;text-align:center;border-radius:0 8px 8px 0;color:#ea580c;font-weight:600;">⏱ Overtime</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($rekapUser as $uid => $r): ?>
+                <?php foreach ($rekapUser as $uid => $r):
+                    $otJam  = floor($r['overtime_minutes'] / 60);
+                    $otSisa = $r['overtime_minutes'] % 60;
+                    $otLabel = $r['overtime_hari'] > 0
+                        ? "{$r['overtime_hari']}x · " . ($otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m")
+                        : '—';
+                ?>
                 <tr style="border-top:1px solid #f1f5f9;">
                     <td style="padding:12px 14px;font-weight:600;">
                         <div style="display:flex;align-items:center;gap:10px;">
@@ -83,24 +95,26 @@
                         </div>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#f0fdf4;color:#16a34a;padding:3px 10px;border-radius:20px;font-weight:700;">
-                            <?= $r['hadir'] ?>
-                        </span>
+                        <span style="background:#f0fdf4;color:#16a34a;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['hadir'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#fffbeb;color:#d97706;padding:3px 10px;border-radius:20px;font-weight:700;">
-                            <?= $r['telat'] ?>
-                        </span>
+                        <span style="background:#fffbeb;color:#d97706;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['telat'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#eff6ff;color:#2563eb;padding:3px 10px;border-radius:20px;font-weight:700;">
-                            <?= $r['izin'] ?>
-                        </span>
+                        <span style="background:#eff6ff;color:#2563eb;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['izin'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-weight:700;">
-                            <?= $r['sakit'] ?>
-                        </span>
+                        <span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['sakit'] ?></span>
+                    </td>
+                    <td style="padding:12px 14px;text-align:center;">
+                        <?php if ($r['overtime_hari'] > 0): ?>
+                            <span style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;padding:3px 10px;border-radius:20px;font-weight:700;font-size:12px;">
+                                <span class="material-icons-round" style="font-size:13px;">timer</span>
+                                <?= $otLabel ?>
+                            </span>
+                        <?php else: ?>
+                            <span style="color:#94a3b8;font-size:13px;">—</span>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -205,7 +219,7 @@ new Chart(document.getElementById('chart7hari'), {
 <style>
 .card { background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.05); }
 @media(max-width:600px) {
-    div[style*="grid-template-columns:repeat(4"] { grid-template-columns:repeat(2,1fr) !important; }
+    div[style*="grid-template-columns:repeat(5"] { grid-template-columns:repeat(2,1fr) !important; }
 }
 </style>
 
