@@ -12,12 +12,8 @@ class Absensi extends BaseController
     protected $kantorModel;
     protected $absensiModel;
 
-    // ─── Konfigurasi Jam Kerja ───────────────────────────
-    // Jam mulai kerja normal (untuk cek terlambat)
     const JAM_MASUK_NORMAL  = '08:00:00';
-    // Batas jam pulang maksimal (tidak ada overtime sebelum ini)
     const JAM_PULANG_NORMAL = '17:00:00';
-    // Maksimal jam kerja per hari (jam)
     const MAX_JAM_KERJA     = 8;
 
     public function __construct()
@@ -87,7 +83,6 @@ class Absensi extends BaseController
             ->where('approval_status', 'pending')
             ->findAll();
 
-        // SUMMARY
         $summary = ['hadir' => 0, 'telat' => 0, 'izin' => 0, 'sakit' => 0, 'overtime' => 0];
         foreach ($data as $d) {
             if ($d['status'] === 'hadir')     $summary['hadir']++;
@@ -99,7 +94,6 @@ class Absensi extends BaseController
             if (!empty($d['is_overtime'])) $summary['overtime']++;
         }
 
-        // REKAP USER — sekarang include overtime
         $rekapUser = [];
         foreach ($data as $d) {
             $uid = $d['user_id'];
@@ -109,8 +103,8 @@ class Absensi extends BaseController
                     'telat'            => 0,
                     'izin'             => 0,
                     'sakit'            => 0,
-                    'overtime_hari'    => 0,      // berapa hari overtime
-                    'overtime_minutes' => 0,      // total menit overtime bulan ini
+                    'overtime_hari'    => 0,
+                    'overtime_minutes' => 0,
                 ];
             }
             if ($d['status'] === 'hadir')     $rekapUser[$uid]['hadir']++;
@@ -125,7 +119,6 @@ class Absensi extends BaseController
             }
         }
 
-        // CHART 7 hari
         $chart = [];
         for ($i = 6; $i >= 0; $i--) {
             $tgl   = date('Y-m-d', strtotime("-$i days"));
@@ -154,6 +147,7 @@ class Absensi extends BaseController
     {
         $userId = session()->get('user_id');
 
+        // ── Cek sudah absen hari ini ──────────────────────────────────────
         $cek = $this->absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
@@ -161,22 +155,76 @@ class Absensi extends BaseController
 
         if ($cek) return $this->res(false, 'Sudah absen masuk hari ini.');
 
+        // ── Ambil konfigurasi kantor ──────────────────────────────────────
+        $kantor = $this->kantorModel->first();
+
+        // ── Validasi GPS ──────────────────────────────────────────────────
+        if ($kantor && !empty($kantor['latitude']) && !empty($kantor['longitude'])) {
+            $lat = (float) $this->request->getPost('latitude');
+            $lng = (float) $this->request->getPost('longitude');
+
+            // Koordinat wajib dikirim dari frontend
+            if (!$lat || !$lng) {
+                return $this->res(false, 'Lokasi GPS tidak terdeteksi. Aktifkan GPS dan coba lagi.');
+            }
+
+            $jarakMeter = $this->hitungJarak(
+                $kantor['latitude'],
+                $kantor['longitude'],
+                $lat,
+                $lng
+            );
+
+            $radiusIzin = (int)($kantor['radius_meter'] ?? 100);
+
+            if ($jarakMeter > $radiusIzin) {
+                return $this->res(false, sprintf(
+                    'Kamu berada %.0f meter dari kantor. Maksimal radius absen: %d meter.',
+                    $jarakMeter,
+                    $radiusIzin
+                ), ['jarak_meter' => round($jarakMeter)]);
+            }
+        }
+
+        // ── Validasi IP ───────────────────────────────────────────────────
+        if ($kantor && !empty($kantor['allowed_ip'])) {
+            $allowedIps  = array_map('trim', explode(',', $kantor['allowed_ip']));
+            $clientIp    = $this->request->getIPAddress();
+
+            if (!in_array($clientIp, $allowedIps)) {
+                return $this->res(false, sprintf(
+                    'Absen hanya diizinkan dari jaringan kantor. IP kamu: %s',
+                    $clientIp
+                ));
+            }
+        }
+
+        // ── Simpan absen ──────────────────────────────────────────────────
         $jam    = date('H:i:s');
         $status = ($jam > self::JAM_MASUK_NORMAL) ? 'telat' : 'hadir';
 
+        $lat = (float) $this->request->getPost('latitude');
+        $lng = (float) $this->request->getPost('longitude');
+
         $this->absensiModel->insert([
-            'user_id'         => $userId,
-            'tanggal'         => date('Y-m-d'),
-            'jam_masuk'       => $jam,
-            'status'          => $status,
-            'approval_status' => 'approved',
-            'is_overtime'     => 0,
-            'overtime_minutes'=> 0,
+            'user_id'          => $userId,
+            'tanggal'          => date('Y-m-d'),
+            'jam_masuk'        => $jam,
+            'status'           => $status,
+            'latitude_masuk'   => $lat ?: null,
+            'longitude_masuk'  => $lng ?: null,
+            'ip_masuk'         => $this->request->getIPAddress(),
+            'approval_status'  => 'approved',
+            'is_overtime'      => 0,
+            'overtime_minutes' => 0,
         ]);
 
         NotificationHelper::absenMasuk($userId, substr($jam, 0, 5), $status);
 
-        return $this->res(true, 'Absen masuk berhasil pukul ' . substr($jam, 0, 5) . '.');
+        $jarakInfo = isset($jarakMeter) ? round($jarakMeter) : null;
+        return $this->res(true, 'Absen masuk berhasil pukul ' . substr($jam, 0, 5) . '.', [
+            'jarak_meter' => $jarakInfo,
+        ]);
     }
 
     // ================= ABSEN PULANG =================
@@ -189,22 +237,56 @@ class Absensi extends BaseController
             ->where('tanggal', date('Y-m-d'))
             ->first();
 
-        if (!$data)                        return $this->res(false, 'Belum absen masuk.');
-        if (!empty($data['jam_keluar']))   return $this->res(false, 'Sudah absen pulang hari ini.');
-        if (empty($data['jam_masuk']))     return $this->res(false, 'Data jam masuk tidak valid.');
+        if (!$data)                      return $this->res(false, 'Belum absen masuk.');
+        if (!empty($data['jam_keluar'])) return $this->res(false, 'Sudah absen pulang hari ini.');
+        if (empty($data['jam_masuk']))   return $this->res(false, 'Data jam masuk tidak valid.');
 
-        $jamKeluar = date('H:i:s');
+        // ── Validasi GPS (pulang) ─────────────────────────────────────────
+        $kantor = $this->kantorModel->first();
 
-        // ── Hitung overtime ────────────────────────────────────────────────
-        // Aturan:
-        //   • Jam kerja normal maksimal 8 jam dari jam_masuk
-        //   • Tapi batas atas jam pulang normal = 17:00
-        //   • Overtime = waktu kerja actual - min(batas_8jam, 17:00)
-        //     dengan catatan batas tidak boleh < jam_masuk (kasus masuk setelah jam 09:00)
+        if ($kantor && !empty($kantor['latitude']) && !empty($kantor['longitude'])) {
+            $lat = (float) $this->request->getPost('latitude');
+            $lng = (float) $this->request->getPost('longitude');
 
-        $tsJamMasuk  = strtotime($data['jam_masuk']);
-        $tsJamKeluar = strtotime($jamKeluar);
-        // Batas kerja = jam masuk + 8 jam (FULL FIX)
+            if (!$lat || !$lng) {
+                return $this->res(false, 'Lokasi GPS tidak terdeteksi. Aktifkan GPS dan coba lagi.');
+            }
+
+            $jarakMeter = $this->hitungJarak(
+                $kantor['latitude'],
+                $kantor['longitude'],
+                $lat,
+                $lng
+            );
+
+            $radiusIzin = (int)($kantor['radius_meter'] ?? 100);
+
+            if ($jarakMeter > $radiusIzin) {
+                return $this->res(false, sprintf(
+                    'Kamu berada %.0f meter dari kantor. Maksimal radius absen: %d meter.',
+                    $jarakMeter,
+                    $radiusIzin
+                ), ['jarak_meter' => round($jarakMeter)]);
+            }
+        }
+
+        // ── Validasi IP (pulang) ──────────────────────────────────────────
+        if ($kantor && !empty($kantor['allowed_ip'])) {
+            $allowedIps = array_map('trim', explode(',', $kantor['allowed_ip']));
+            $clientIp   = $this->request->getIPAddress();
+
+            if (!in_array($clientIp, $allowedIps)) {
+                return $this->res(false, sprintf(
+                    'Absen hanya diizinkan dari jaringan kantor. IP kamu: %s',
+                    $clientIp
+                ));
+            }
+        }
+
+        // ── Hitung overtime ───────────────────────────────────────────────
+        $jamKeluar     = date('H:i:s');
+        $tsJamMasuk    = strtotime($data['jam_masuk']);
+        $tsJamKeluar   = strtotime($jamKeluar);
         $tsBatasNormal = $tsJamMasuk + (self::MAX_JAM_KERJA * 3600);
 
         $isOvertime      = false;
@@ -215,16 +297,20 @@ class Absensi extends BaseController
             $overtimeMinutes = (int) round(($tsJamKeluar - $tsBatasNormal) / 60);
         }
 
+        $lat = (float) $this->request->getPost('latitude');
+        $lng = (float) $this->request->getPost('longitude');
+
         $this->absensiModel->update($data['id'], [
-            'jam_keluar'       => $jamKeluar,
-            'is_overtime'      => $isOvertime ? 1 : 0,
-            'overtime_minutes' => $overtimeMinutes,
+            'jam_keluar'        => $jamKeluar,
+            'latitude_keluar'   => $lat ?: null,
+            'longitude_keluar'  => $lng ?: null,
+            'ip_keluar'         => $this->request->getIPAddress(),
+            'is_overtime'       => $isOvertime ? 1 : 0,
+            'overtime_minutes'  => $overtimeMinutes,
         ]);
 
-        // Notifikasi pulang biasa
         NotificationHelper::absenPulang($userId, substr($jamKeluar, 0, 5));
 
-        // Notifikasi overtime jika ada
         if ($isOvertime) {
             NotificationHelper::overtime($userId, substr($jamKeluar, 0, 5), $overtimeMinutes);
         }
@@ -236,7 +322,8 @@ class Absensi extends BaseController
             $msg .= " Overtime: {$jam}j {$mnt}m tercatat.";
         }
 
-        return $this->res(true, $msg);
+        $jarakInfo = isset($jarakMeter) ? round($jarakMeter) : null;
+        return $this->res(true, $msg, ['jarak_meter' => $jarakInfo]);
     }
 
     // ================= IZIN =================
@@ -306,24 +393,24 @@ class Absensi extends BaseController
         return redirect()->to('/absensi/manager')->with('success', 'Pengajuan ditolak ❌');
     }
 
-    // ================= HELPER =================
-    private function res($s, $m)
+    // ================= HELPERS =================
+    private function res(bool $s, string $m, array $extra = [])
     {
-        return $this->response->setJSON([
+        return $this->response->setJSON(array_merge([
             'status'  => $s,
             'message' => $m,
-        ]);
+        ], $extra));
     }
 
-    private function hitungJarak($lat1, $lon1, $lat2, $lon2)
+    private function hitungJarak($lat1, $lon1, $lat2, $lon2): float
     {
         $R    = 6371000;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
 
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-            sin($dLon / 2) * sin($dLon / 2);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+           + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+           * sin($dLon / 2) * sin($dLon / 2);
 
         return $R * (2 * atan2(sqrt($a), sqrt(1 - $a)));
     }

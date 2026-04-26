@@ -9,7 +9,6 @@ class Idle extends BaseController
 {
     protected $idleModel;
 
-    // Threshold idle (menit) sebelum notif dikirim ke manager
     const IDLE_THRESHOLD_MENIT = 5;
 
     public function __construct()
@@ -19,6 +18,11 @@ class Idle extends BaseController
 
     public function start()
     {
+        // Manager tidak dihitung idle
+        if (session()->get('role') === 'manager') {
+            return $this->response->setJSON(['status' => true]);
+        }
+
         $userId = session()->get('user_id') ?? 1;
 
         $existing = $this->idleModel
@@ -38,6 +42,11 @@ class Idle extends BaseController
 
     public function stop()
     {
+        // Manager tidak punya record idle, skip saja
+        if (session()->get('role') === 'manager') {
+            return $this->response->setJSON(['status' => true]);
+        }
+
         $userId = session()->get('user_id') ?? 1;
 
         $idle = $this->idleModel
@@ -69,6 +78,14 @@ class Idle extends BaseController
      */
     public function status()
     {
+        // Manager tidak punya status idle
+        if (session()->get('role') === 'manager') {
+            return $this->response->setJSON([
+                'status'      => true,
+                'sedang_idle' => false,
+            ]);
+        }
+
         $userId = session()->get('user_id') ?? 1;
 
         $idle = $this->idleModel

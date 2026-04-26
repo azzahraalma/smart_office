@@ -57,7 +57,6 @@ class Dashboard extends BaseController
                 ->join('users', 'users.id = tasks.assigned_to', 'left')
                 ->orderBy('tasks.created_at', 'DESC')
                 ->findAll(6);
-
         } else {
 
             $taskAktif = $taskModel
@@ -134,8 +133,15 @@ class Dashboard extends BaseController
 
         // ================= OVERTIME =================
         $overtime = false;
-        if ($absenHariIni && empty($absenHariIni['jam_keluar'])) {
-            $overtime = time() > strtotime(date('Y-m-d') . ' 17:00:00');
+        if ($absenHariIni && !$absenHariIni['jam_keluar']) {
+            // Jangan hitung overtime kalau status izin/pending
+            $statusAman = in_array($absenHariIni['status'], ['izin', 'alpha']);
+            $approvalPending = ($absenHariIni['approval_status'] ?? '') === 'pending';
+
+            if (!$statusAman && !$approvalPending) {
+                $batas    = strtotime($absenHariIni['jam_masuk']) + (8 * 3600);
+                $overtime = time() > $batas;
+            }
         }
 
         // ================= DATA FINAL =================

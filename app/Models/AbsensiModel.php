@@ -29,7 +29,9 @@ class AbsensiModel extends Model
         'approved_by',
         'approved_at',
         'approval_status',
-        'jenis'
+        'jenis',
+        'is_overtime',      
+        'overtime_minutes',
     ];
 
     protected $useTimestamps = true;

@@ -21,6 +21,20 @@
     <div class="so-alert error"><span class="material-icons-round">error_outline</span><?= esc(session()->getFlashdata('error')) ?></div>
 <?php endif; ?>
 
+<?php
+// Tentukan kondisi tombol di PHP agar logikanya jelas
+$sudahMasuk  = $absenHariIni && !empty($absenHariIni['jam_masuk']);
+$sudahPulang = $absenHariIni && !empty($absenHariIni['jam_keluar']);
+$sudahIzin   = $absenHariIni && in_array($absenHariIni['status'], ['izin', 'sakit']);
+
+// Tombol masuk: disabled kalau sudah masuk ATAU sudah izin
+$disableMasuk  = $sudahMasuk || $sudahIzin;
+// Tombol pulang: disabled kalau belum masuk, sudah pulang, atau status izin
+$disablePulang = !$sudahMasuk || $sudahPulang || $sudahIzin;
+// Tombol izin: disabled kalau sudah ada data absensi apapun hari ini
+$disableIzin   = $absenHariIni !== null;
+?>
+
 <div class="row g-3">
 
     <!-- PANEL ABSENSI -->
@@ -31,7 +45,6 @@
                     <span class="material-icons-round" style="font-size:18px;vertical-align:middle;margin-right:6px;color:var(--primary);">fingerprint</span>
                     Absensi Hari Ini
                 </span>
-                <!-- Live Clock -->
                 <div style="font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;" id="absen-clock">--:--:--</div>
             </div>
             <div class="so-card-body">
@@ -50,38 +63,50 @@
                     <button id="btn-masuk" class="btn-so-success"
                         onclick="doAbsen('masuk')"
                         style="justify-content:center;padding:16px;font-size:15px;flex-direction:column;gap:6px;"
-                        <?= ($absenHariIni && !empty($absenHariIni['jam_masuk'])) ? 'disabled' : '' ?>>
+                        <?= $disableMasuk ? 'disabled' : '' ?>>
                         <span class="material-icons-round" style="font-size:28px;">login</span>
                         <span>Absen Masuk</span>
-                        <?php if ($absenHariIni && !empty($absenHariIni['jam_masuk'])): ?>
-                            <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_masuk'],0,5) ?></small>
+                        <?php if ($sudahMasuk): ?>
+                            <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_masuk'], 0, 5) ?></small>
+                        <?php elseif ($sudahIzin): ?>
+                            <small style="font-size:12px;opacity:.8;">Status: <?= ucfirst($absenHariIni['status']) ?></small>
                         <?php endif; ?>
                     </button>
 
                     <button id="btn-pulang" class="btn-so-danger"
                         onclick="doAbsen('pulang')"
                         style="justify-content:center;padding:16px;font-size:15px;flex-direction:column;gap:6px;"
-                        <?= (!$absenHariIni || !empty($absenHariIni['jam_keluar'])) ? 'disabled' : '' ?>>
+                        <?= $disablePulang ? 'disabled' : '' ?>>
                         <span class="material-icons-round" style="font-size:28px;">logout</span>
                         <span>Absen Pulang</span>
-                        <?php if ($absenHariIni && !empty($absenHariIni['jam_keluar'])): ?>
-                            <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_keluar'],0,5) ?></small>
+                        <?php if ($sudahPulang): ?>
+                            <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_keluar'], 0, 5) ?></small>
                         <?php endif; ?>
                     </button>
                 </div>
 
                 <!-- Tombol Izin -->
                 <div style="margin-bottom:14px;">
-                    <button onclick="openIzinModal()"
-                        class="btn-so-outline"
-                        style="width:100%;justify-content:center;padding:12px;font-size:14px;gap:8px;">
-                        <span class="material-icons-round" style="font-size:20px;">event_busy</span>
-                        Ajukan Izin / Sakit
-                    </button>
+                    <?php if ($disableIzin): ?>
+                        <!-- Sudah ada data absensi — tampilkan info, bukan tombol aktif -->
+                        <div style="width:100%;padding:12px;font-size:14px;border:1.5px solid var(--border);border-radius:12px;
+                                    background:#f8faff;color:var(--text-muted);display:flex;align-items:center;
+                                    justify-content:center;gap:8px;">
+                            <span class="material-icons-round" style="font-size:20px;">event_busy</span>
+                            Izin sudah diajukan atau absensi hari ini sudah tercatat
+                        </div>
+                    <?php else: ?>
+                        <button onclick="openIzinModal()"
+                            class="btn-so-outline"
+                            style="width:100%;justify-content:center;padding:12px;font-size:14px;gap:8px;">
+                            <span class="material-icons-round" style="font-size:20px;">event_busy</span>
+                            Ajukan Izin / Sakit
+                        </button>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Tombol Break -->
-                <?php if ($absenHariIni && empty($absenHariIni['jam_keluar'])): ?>
+                <?php if ($sudahMasuk && !$sudahPulang): ?>
                 <div style="margin-bottom:14px;">
                     <button id="btn-break"
                         onclick="toggleBreak()"
@@ -126,7 +151,6 @@
                         $colorBg     = ['hadir'=>'#d1fae5','telat'=>'#fef3c7','izin'=>'#dbeafe','sakit'=>'#dbeafe','alpha'=>'#fee2e2'];
                         $colorIcon   = ['hadir'=>'#059669','telat'=>'#d97706','izin'=>'#2563eb','sakit'=>'#2563eb','alpha'=>'#dc2626'];
 
-                        // Hitung durasi kerja
                         $durasiKerja = null;
                         if (!empty($absenHariIni['jam_masuk']) && !empty($absenHariIni['jam_keluar'])) {
                             $diff = strtotime($absenHariIni['jam_keluar']) - strtotime($absenHariIni['jam_masuk']);
@@ -135,64 +159,55 @@
                             }
                         }
 
-                        // Data overtime
                         $isOt   = !empty($absenHariIni['is_overtime']);
                         $otMnt  = (int)($absenHariIni['overtime_minutes'] ?? 0);
                         $otJam  = floor($otMnt / 60);
                         $otSisa = $otMnt % 60;
                         $otLabel = $otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m";
+                        $st = $absenHariIni['status'];
                     ?>
 
-                    <!-- Status icon & badge -->
                     <div style="text-align:center;padding:16px 0 20px;">
-                        <div style="width:64px;height:64px;border-radius:18px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;
-                            background:<?= $colorBg[$absenHariIni['status']] ?? '#fee2e2' ?>;">
-                            <span class="material-icons-round" style="font-size:32px;color:<?= $colorIcon[$absenHariIni['status']] ?? '#dc2626' ?>;">
-                                <?= $iconMap[$absenHariIni['status']] ?? 'cancel' ?>
+                        <div style="width:64px;height:64px;border-radius:18px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;background:<?= $colorBg[$st] ?? '#fee2e2' ?>;">
+                            <span class="material-icons-round" style="font-size:32px;color:<?= $colorIcon[$st] ?? '#dc2626' ?>;">
+                                <?= $iconMap[$st] ?? 'cancel' ?>
                             </span>
                         </div>
                         <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px;">
-                            <?= $statusLabel[$absenHariIni['status']] ?? ucfirst($absenHariIni['status']) ?>
+                            <?= $statusLabel[$st] ?? ucfirst($st) ?>
                         </div>
-                        <span class="so-badge <?= $badge ?>"><?= ucfirst($absenHariIni['status']) ?></span>
+                        <span class="so-badge <?= $badge ?>"><?= ucfirst($st) ?></span>
                     </div>
 
                     <hr class="so-divider">
 
-                    <!-- Jam Masuk & Pulang -->
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
                         <div style="background:#f8faff;border-radius:10px;padding:12px;text-align:center;">
                             <span class="material-icons-round" style="font-size:18px;color:var(--success);display:block;margin-bottom:4px;">login</span>
                             <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Masuk</div>
                             <div style="font-size:18px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;">
-                                <?= ($absenHariIni['jam_masuk']) ? substr($absenHariIni['jam_masuk'],0,5) : '—' ?>
+                                <?= !empty($absenHariIni['jam_masuk']) ? substr($absenHariIni['jam_masuk'], 0, 5) : '—' ?>
                             </div>
                         </div>
                         <div style="background:#f8faff;border-radius:10px;padding:12px;text-align:center;">
                             <span class="material-icons-round" style="font-size:18px;color:<?= $isOt ? '#ea580c' : 'var(--danger)' ?>;display:block;margin-bottom:4px;">logout</span>
                             <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Pulang</div>
                             <div style="font-size:18px;font-weight:800;color:<?= $isOt ? '#ea580c' : 'var(--text)' ?>;font-variant-numeric:tabular-nums;">
-                                <?= !empty($absenHariIni['jam_keluar']) ? substr($absenHariIni['jam_keluar'],0,5) : '—' ?>
+                                <?= !empty($absenHariIni['jam_keluar']) ? substr($absenHariIni['jam_keluar'], 0, 5) : '—' ?>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Durasi Kerja & Overtime -->
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-
-                        <!-- Durasi Kerja -->
                         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center;">
                             <span class="material-icons-round" style="font-size:18px;color:#16a34a;display:block;margin-bottom:4px;">timelapse</span>
                             <div style="font-size:11px;color:#16a34a;font-weight:600;margin-bottom:2px;">Durasi Kerja</div>
-                            <div style="font-size:16px;font-weight:800;color:#15803d;">
-                                <?= $durasiKerja ?? '—' ?>
-                            </div>
+                            <div style="font-size:16px;font-weight:800;color:#15803d;"><?= $durasiKerja ?? '—' ?></div>
                             <?php if (!$durasiKerja && !empty($absenHariIni['jam_masuk']) && empty($absenHariIni['jam_keluar'])): ?>
                                 <div style="font-size:10px;color:#16a34a;margin-top:2px;">Sedang berjalan</div>
                             <?php endif; ?>
                         </div>
 
-                        <!-- Overtime -->
                         <?php if ($isOt): ?>
                         <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px;text-align:center;">
                             <span class="material-icons-round" style="font-size:18px;color:#ea580c;display:block;margin-bottom:4px;">timer</span>
@@ -208,27 +223,23 @@
                             <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Tidak ada</div>
                         </div>
                         <?php endif; ?>
-
                     </div>
 
-                    <!-- Banner overtime kalau ada -->
                     <?php if ($isOt): ?>
                     <div style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;">
                         <span class="material-icons-round" style="font-size:20px;color:#ea580c;flex-shrink:0;">warning_amber</span>
                         <div>
                             <div style="font-size:12px;font-weight:700;color:#c2410c;">Overtime Tercatat</div>
-                            <div style="font-size:11px;color:#9a3412;margin-top:1px;">
-                                Kamu lembur <?= $otLabel ?> hari ini. Manager sudah mendapat notifikasi.
-                            </div>
+                            <div style="font-size:11px;color:#9a3412;margin-top:1px;">Kamu lembur <?= $otLabel ?> hari ini. Manager sudah mendapat notifikasi.</div>
                         </div>
                     </div>
                     <?php endif; ?>
 
                     <?php if (!empty($absenHariIni['keterangan'])): ?>
-                        <div style="background:#f8faff;border-radius:10px;padding:12px 14px;">
-                            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Keterangan</div>
-                            <div style="font-size:13px;color:var(--text);"><?= esc($absenHariIni['keterangan']) ?></div>
-                        </div>
+                    <div style="background:#f8faff;border-radius:10px;padding:12px 14px;">
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Keterangan</div>
+                        <div style="font-size:13px;color:var(--text);"><?= esc($absenHariIni['keterangan']) ?></div>
+                    </div>
                     <?php endif; ?>
 
                 <?php else: ?>
@@ -245,31 +256,25 @@
 
 </div>
 
-<!-- ══════════════════════════════════════════════ -->
-<!--  MODAL IZIN / SAKIT                           -->
-<!-- ══════════════════════════════════════════════ -->
+<!-- MODAL IZIN / SAKIT -->
 <div id="izinModal"
     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;
            justify-content:center;align-items:center;padding:16px;">
     <div style="background:var(--surface,#fff);border-radius:18px;width:100%;max-width:420px;
                 box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;animation:modalIn .25s ease;">
 
-        <!-- Modal Header -->
         <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <span class="material-icons-round" style="font-size:22px;color:var(--primary);">event_busy</span>
                 <span style="font-size:16px;font-weight:700;color:var(--text);">Ajukan Izin / Sakit</span>
             </div>
             <button onclick="closeIzinModal()"
-                style="background:none;border:none;cursor:pointer;padding:4px;border-radius:8px;
-                       display:flex;align-items:center;color:var(--text-muted);">
+                style="background:none;border:none;cursor:pointer;padding:4px;border-radius:8px;display:flex;align-items:center;color:var(--text-muted);">
                 <span class="material-icons-round" style="font-size:22px;">close</span>
             </button>
         </div>
 
-        <!-- Modal Body -->
         <div style="padding:24px;">
-
             <div style="margin-bottom:18px;">
                 <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
                     Jenis Ketidakhadiran
@@ -326,9 +331,9 @@
 </div>
 
 <style>
-@keyframes spin    { to { transform: rotate(360deg); } }
-@keyframes modalIn { from { opacity:0; transform:scale(.95) translateY(12px); } to { opacity:1; transform:scale(1) translateY(0); } }
-button:disabled { opacity:.45 !important; cursor:not-allowed !important; }
+@keyframes spin    { to { transform:rotate(360deg); } }
+@keyframes modalIn { from { opacity:0;transform:scale(.95) translateY(12px); } to { opacity:1;transform:scale(1) translateY(0); } }
+button:disabled { opacity:.45 !important; cursor:not-allowed !important; pointer-events:none !important; }
 .btn-so-success, .btn-so-danger, .btn-so-primary, .btn-so-outline { display:flex; }
 </style>
 
@@ -375,7 +380,7 @@ function showResult(ok, msg, targetId = 'absen-result') {
     el.className = `so-alert ${ok ? 'success' : 'error'}`;
     el.innerHTML = `<span class="material-icons-round">${ok ? 'check_circle_outline' : 'error_outline'}</span>${msg}`;
     el.classList.remove('d-none');
-    if (ok) setTimeout(() => location.reload(), 1800);
+    if (ok && targetId === 'absen-result') setTimeout(() => location.reload(), 1800);
 }
 
 // ── Absen masuk / pulang ─────────────────────────
@@ -390,7 +395,7 @@ function doAbsen(tipe) {
     .then(r => r.json())
     .then(d => {
         showResult(d.status, d.message);
-        if (d.jarak_meter !== undefined) {
+        if (d.jarak_meter != null) {
             document.getElementById('jarak-info').style.display = 'block';
             document.getElementById('jarak-val').textContent = d.jarak_meter;
         }
@@ -458,6 +463,7 @@ function submitIzin() {
 
 // ── Break ────────────────────────────────────────
 let sedangBreak = false;
+<?php if ($sudahMasuk && !$sudahPulang): ?>
 fetch('/break/status')
     .then(r => r.json())
     .then(d => {
@@ -467,6 +473,7 @@ fetch('/break/status')
             document.getElementById('break-info').textContent = `Break dimulai pukul ${d.mulai}`;
         }
     });
+<?php endif; ?>
 
 function updateBreakUI() {
     const btn   = document.getElementById('btn-break');
@@ -494,7 +501,7 @@ function toggleBreak() {
     btn.disabled = true;
     fetch(url, {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: ''
     })
     .then(r => r.json())

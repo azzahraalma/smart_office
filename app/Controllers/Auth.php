@@ -128,6 +128,26 @@ class Auth extends BaseController
 
     public function logout()
     {
+        $userId = session()->get('user_id') ?? null;
+
+        if ($userId) {
+            $idleModel = new \App\Models\IdleLogModel();
+
+            $idle = $idleModel
+                ->where('user_id', $userId)
+                ->where('selesai', null)
+                ->first();
+
+            if ($idle) {
+                $durasiMenit = (int) floor((time() - strtotime($idle['mulai'])) / 60);
+
+                $idleModel->update($idle['id'], [
+                    'selesai' => date('Y-m-d H:i:s'),
+                    'durasi'  => $durasiMenit,
+                ]);
+            }
+        }
+
         session()->destroy();
         return redirect()->to('/login')->with('success', 'Kamu berhasil logout.');
     }
