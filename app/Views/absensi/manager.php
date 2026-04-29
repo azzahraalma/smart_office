@@ -1,7 +1,6 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- HEADER -->
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
     <div>
         <h4 style="font-weight:800;margin:0;">Dashboard Absensi</h4>
@@ -15,7 +14,6 @@
     </form>
 </div>
 
-<!-- FLASH -->
 <?php if (session()->getFlashdata('success')): ?>
 <div style="background:#dcfce7;color:#16a34a;padding:12px 16px;border-radius:10px;margin-bottom:20px;font-weight:600;display:flex;align-items:center;gap:8px;">
     ✅ <?= session()->getFlashdata('success') ?>
@@ -27,23 +25,23 @@
 </div>
 <?php endif; ?>
 
-<!-- SUMMARY CARDS — 5 kartu termasuk overtime -->
+<!-- tabel-->
 <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;">
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px 20px;">
         <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Hadir</div>
         <div style="font-size:28px;font-weight:800;color:#15803d;"><?= $summary['hadir'] ?></div>
     </div>
-    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:16px 20px;">
-        <div style="font-size:11px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Telat</div>
-        <div style="font-size:28px;font-weight:800;color:#b45309;"><?= $summary['telat'] ?></div>
-    </div>
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:16px 20px;">
         <div style="font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Izin</div>
         <div style="font-size:28px;font-weight:800;color:#1d4ed8;"><?= $summary['izin'] ?></div>
     </div>
+    <div style="background:#fdf4ff;border:1px solid #f0abfc;border-radius:14px;padding:16px 20px;">
+        <div style="font-size:11px;font-weight:700;color:#a21caf;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sakit</div>
+        <div style="font-size:28px;font-weight:800;color:#86198f;"><?= $summary['sakit'] ?></div>
+    </div>
     <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:14px;padding:16px 20px;">
-        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Sakit</div>
-        <div style="font-size:28px;font-weight:800;color:#b91c1c;"><?= $summary['sakit'] ?></div>
+        <div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Alpha</div>
+        <div style="font-size:28px;font-weight:800;color:#b91c1c;"><?= $summary['alpha'] ?></div>
     </div>
     <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:16px 20px;">
         <div style="font-size:11px;font-weight:700;color:#ea580c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Overtime</div>
@@ -52,13 +50,13 @@
     </div>
 </div>
 
-<!-- CHART -->
+<!-- chart -->
 <div class="card" style="margin-bottom:20px;">
     <div style="font-weight:700;font-size:14px;margin-bottom:16px;">📈 Kehadiran 7 Hari Terakhir</div>
     <canvas id="chart7hari" height="80"></canvas>
 </div>
 
-<!-- REKAP KARYAWAN — dengan kolom overtime -->
+<!-- rekap -->
 <div class="card" style="margin-bottom:20px;">
     <div style="font-weight:700;font-size:14px;margin-bottom:16px;">👥 Performa Karyawan — <?= date('F Y', strtotime($bulan . '-01')) ?></div>
 
@@ -71,16 +69,16 @@
                 <tr style="background:#f8fafc;">
                     <th style="padding:10px 14px;text-align:left;border-radius:8px 0 0 8px;color:#64748b;font-weight:600;">Karyawan</th>
                     <th style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✔ Hadir</th>
-                    <th style="padding:10px 14px;text-align:center;color:#d97706;font-weight:600;">⏰ Telat</th>
                     <th style="padding:10px 14px;text-align:center;color:#2563eb;font-weight:600;">📌 Izin</th>
-                    <th style="padding:10px 14px;text-align:center;color:#dc2626;font-weight:600;">🤒 Sakit</th>
+                    <th style="padding:10px 14px;text-align:center;color:#a21caf;font-weight:600;">🤒 Sakit</th>
+                    <th style="padding:10px 14px;text-align:center;color:#dc2626;font-weight:600;">🚫 Alpha</th>
                     <th style="padding:10px 14px;text-align:center;border-radius:0 8px 8px 0;color:#ea580c;font-weight:600;">⏱ Overtime</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($rekapUser as $uid => $r):
-                    $otJam  = floor($r['overtime_minutes'] / 60);
-                    $otSisa = $r['overtime_minutes'] % 60;
+                    $otJam   = floor($r['overtime_minutes'] / 60);
+                    $otSisa  = $r['overtime_minutes'] % 60;
                     $otLabel = $r['overtime_hari'] > 0
                         ? "{$r['overtime_hari']}x · " . ($otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m")
                         : '—';
@@ -98,13 +96,13 @@
                         <span style="background:#f0fdf4;color:#16a34a;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['hadir'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#fffbeb;color:#d97706;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['telat'] ?></span>
-                    </td>
-                    <td style="padding:12px 14px;text-align:center;">
                         <span style="background:#eff6ff;color:#2563eb;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['izin'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['sakit'] ?></span>
+                        <span style="background:#fdf4ff;color:#a21caf;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['sakit'] ?></span>
+                    </td>
+                    <td style="padding:12px 14px;text-align:center;">
+                        <span style="background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:20px;font-weight:700;"><?= $r['alpha'] ?></span>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
                         <?php if ($r['overtime_hari'] > 0): ?>
@@ -124,7 +122,7 @@
     <?php endif; ?>
 </div>
 
-<!-- APPROVAL -->
+<!-- approval -->
 <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
         <div style="font-weight:700;font-size:14px;">📋 Approval Izin / Sakit</div>
@@ -142,7 +140,13 @@
         </div>
     <?php else: ?>
     <div style="display:grid;gap:12px;">
-        <?php foreach ($pending as $p): ?>
+        <?php foreach ($pending as $p):
+            $pStatus     = $p['status'];
+            $isSakit     = $pStatus === 'sakit';
+            $statusColor = $isSakit ? '#dc2626' : '#2563eb';
+            $statusBg    = $isSakit ? '#fef2f2' : '#eff6ff';
+            $statusLabel = ucfirst($pStatus);
+        ?>
         <div style="border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#fff;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
 
             <!-- AVATAR -->
@@ -159,10 +163,9 @@
                     <?= date('d F Y', strtotime($p['tanggal'])) ?>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                    <span style="background:<?= ($p['jenis'] ?? '') === 'sakit' ? '#fef2f2' : '#eff6ff' ?>;
-                                 color:<?= ($p['jenis'] ?? '') === 'sakit' ? '#dc2626' : '#2563eb' ?>;
+                    <span style="background:<?= $statusBg ?>;color:<?= $statusColor ?>;
                                  font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;text-transform:uppercase;">
-                        <?= $p['jenis'] ?? 'izin' ?>
+                        <?= $statusLabel ?>
                     </span>
                     <span style="font-size:12px;color:#64748b;"><?= esc($p['keterangan'] ?? '-') ?></span>
                 </div>
@@ -177,19 +180,52 @@
                         ✅ Approve
                     </button>
                 </form>
-                <form method="post" action="/absensi/reject/<?= $p['id'] ?>">
-                    <?= csrf_field() ?>
-                    <button type="submit"
-                        style="background:#ef4444;color:#fff;padding:8px 18px;border-radius:9px;border:none;cursor:pointer;font-weight:600;font-size:13px;">
-                        ❌ Reject
-                    </button>
-                </form>
+                <button type="button"
+                    onclick="openRejectModal(<?= $p['id'] ?>, '<?= esc(addslashes($userMap[$p['user_id']] ?? 'User #' . $p['user_id'])) ?>', '<?= date('d F Y', strtotime($p['tanggal'])) ?>')"
+                    style="background:#ef4444;color:#fff;padding:8px 18px;border-radius:9px;border:none;cursor:pointer;font-weight:600;font-size:13px;">
+                    ❌ Reject
+                </button>
             </div>
 
         </div>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
+</div>
+
+<!--reject notif -->
+<div id="rejectOverlay"
+    onclick="closeRejectModal()"
+    style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:999;"></div>
+
+<!-- reject -->
+<div id="rejectModal"
+    style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1000;
+           background:#fff;border-radius:18px;padding:28px 28px 22px;width:90%;max-width:400px;
+           box-shadow:0 20px 60px rgba(0,0,0,.18);">
+    <div style="text-align:center;margin-bottom:18px;">
+        <div style="width:56px;height:56px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px;">
+            ⚠️
+        </div>
+        <div style="font-size:17px;font-weight:800;color:#1e293b;margin-bottom:6px;">Tolak Pengajuan?</div>
+        <div id="rejectDesc" style="font-size:13px;color:#64748b;line-height:1.5;"></div>
+    </div>
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:11px 14px;font-size:12px;color:#b91c1c;margin-bottom:20px;">
+        Karyawan dapat absen kembali atau mengajukan ulang setelah ditolak.
+    </div>
+    <div style="display:flex;gap:10px;">
+        <button onclick="closeRejectModal()"
+            style="flex:1;padding:10px;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;color:#475569;font-weight:600;font-size:13px;cursor:pointer;">
+            Batal
+        </button>
+        <form id="rejectForm" method="post" style="flex:1;">
+            <?= csrf_field() ?>
+            <button type="submit"
+                style="width:100%;padding:10px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">
+                Ya, Tolak
+            </button>
+        </form>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -213,6 +249,25 @@ new Chart(document.getElementById('chart7hari'), {
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
     }
+});
+
+function openRejectModal(id, nama, tanggal) {
+    document.getElementById('rejectDesc').innerHTML =
+        'Kamu akan menolak pengajuan dari <strong>' + nama + '</strong> pada <strong>' + tanggal + '</strong>.';
+    document.getElementById('rejectForm').action = '/absensi/reject/' + id;
+    document.getElementById('rejectModal').style.display = 'block';
+    document.getElementById('rejectOverlay').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeRejectModal() {
+    document.getElementById('rejectModal').style.display = 'none';
+    document.getElementById('rejectOverlay').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeRejectModal();
 });
 </script>
 

@@ -1,13 +1,11 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- HEADER -->
 <div class="mb-4">
     <h4 style="font-weight:800;margin-bottom:4px;">Manajemen Task</h4>
     <div style="font-size:13px;color:var(--text-muted);">Kelola dan pantau progress tugas</div>
 </div>
 
-<!-- FLASH -->
 <?php if (session()->getFlashdata('success')): ?>
 <div class="so-alert success"><?= esc(session()->getFlashdata('success')) ?></div>
 <?php endif; ?>
@@ -27,7 +25,7 @@ foreach ($tasks as $t) {
 $total = count($tasks);
 ?>
 
-<!-- STAT CARD -->
+<!-- statistik -->
 <div class="row g-3 mb-4">
     <div class="col-4">
         <div class="i-stat-card" style="background:linear-gradient(135deg,#3b82f6,#60a5fa);">
@@ -49,7 +47,7 @@ $total = count($tasks);
     </div>
 </div>
 
-<!-- FILTER -->
+<!-- filter -->
 <div class="i-filter-wrap">
     <button class="i-filter-btn active" data-filter="all">Semua (<?= $total ?>)</button>
     <button class="i-filter-btn" data-filter="todo">To Do</button>
@@ -57,7 +55,7 @@ $total = count($tasks);
     <button class="i-filter-btn" data-filter="done">Done</button>
 </div>
 
-<!-- GRID TASK -->
+<!-- task -->
 <div class="row g-3" id="taskGrid">
 
 <?php if (empty($tasks)): ?>
@@ -147,7 +145,6 @@ $isOverdue = $task['deadline']
 <?php endforeach; ?>
 </div>
 
-<!-- TOMBOL TAMBAH (MANAGER ONLY) -->
 <?php if (session()->get('role') === 'manager'): ?>
 <div style="margin-top:30px;text-align:center;">
     <a href="/task/create" class="btn-so-primary" style="padding:12px 28px;border-radius:12px;text-decoration:none;">

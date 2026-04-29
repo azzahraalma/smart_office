@@ -10,14 +10,13 @@ $taskSelesai  = $taskSelesai     ?? 0;
 $absensiList  = $absensiList     ?? [];
 $taskList     = $taskList        ?? [];
 $chartHadir   = $chartHadir      ?? [];
-$statusHadir  = $statusHadir     ?? ['hadir' => 0, 'telat' => 0, 'izin' => 0, 'alpha' => 0];
 
-// Warna task aktif — dihitung di PHP, bukan di inline style
+$statusHadir  = $statusHadir     ?? ['hadir' => 0, 'izin' => 0, 'sakit' => 0, 'alpha' => 0];
+
 $taskSubColor = $taskAktif > 10 ? '#ef4444' : '#9ca3af';
 $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
 ?>
 
-<!-- Page Header -->
 <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
         <h1 class="page-heading">Dashboard</h1>
@@ -35,7 +34,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
     </div>
 </div>
 
-<!-- Stat Cards -->
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3">
         <div class="stat-card primary">
@@ -44,7 +42,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
             </div>
             <div class="stat-card-label">Total Karyawan</div>
             <div class="stat-card-value"><?= $totalKary ?></div>
-            <div class="stat-card-sub" style="color:#10b981">+2 bulan ini</div>
         </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -81,7 +78,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
     </div>
 </div>
 
-<!-- Charts Row -->
 <div class="row g-4 mb-4">
 
     <!-- Bar Chart Kehadiran 7 Hari -->
@@ -96,15 +92,12 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
             </div>
             <div class="so-card-body">
                 <?php
-                // Generate label 7 hari terakhir secara dinamis
-                // index 0 = 6 hari lalu, index 6 = hari ini
                 $dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
                 $labels7  = [];
                 for ($di = 6; $di >= 0; $di--) {
                     $labels7[] = $dayNames[(int) date('w', strtotime("-{$di} days"))];
                 }
 
-                // Pastikan $vals selalu 7 elemen
                 $vals = array_values($chartHadir);
                 while (count($vals) < 7) $vals[] = 0;
                 $vals = array_slice($vals, 0, 7);
@@ -115,7 +108,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
                         $pct      = round(($vals[$i] / $maxV) * 100);
                         $barH     = $vals[$i] > 0 ? max($pct, 10) : 0;
                         $isToday  = ($i === 6);
-                        // Semua nilai disiapkan sebagai variabel PHP murni
                         $barBg    = $isToday ? 'linear-gradient(to top,#3b82f6,#6366f1)' : 'linear-gradient(to top,#3b82f6,#93c5fd)';
                         $lblColor = $isToday ? '#3b82f6' : '#6b7280';
                         $lblWeight = $isToday ? '800' : '600';
@@ -135,7 +127,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         </div>
     </div>
 
-    <!-- Donut Chart Status Kehadiran -->
     <div class="col-lg-5">
         <div class="so-card h-100">
             <div class="so-card-header">
@@ -144,27 +135,36 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
             <div class="so-card-body">
                 <div class="dash-donut-wrap">
                     <div class="dash-donut-svg">
+                        <?php
+                        $donutColors = ['#10b981','#f97316', '#f59e0b', '#0ea5e9'];
+                        $donutLabels = ['hadir', 'alpha', 'izin', 'sakit'];
+                        $donutTotal  = max(1, array_sum(array_intersect_key($statusHadir, array_flip($donutLabels))));
+                        $circ        = 2 * M_PI * 38;
+                        $off         = 0;
+
+                        $segments = [];
+                        foreach ($donutLabels as $li => $lbl) {
+                            $v          = $statusHadir[$lbl] ?? 0;
+                            $dash       = round(($v / $donutTotal) * $circ, 2);
+                            $gap        = round($circ - $dash, 2);
+                            $segments[] = [
+                                'color'  => $donutColors[$li],
+                                'dash'   => $dash,
+                                'gap'    => $gap,
+                                'offset' => round($off, 2),
+                            ];
+                            $off += $dash;
+                        }
+                        ?>
                         <svg viewBox="0 0 100 100" width="120" height="120" style="transform:rotate(-90deg)">
-                            <?php
-                            $donutColors = ['#10b981', '#f59e0b', '#0ea5e9'];
-                            $donutLabels = ['hadir', 'telat', 'izin'];
-                            $donutTotal  = max(1, array_sum(array_intersect_key($statusHadir, array_flip($donutLabels))));
-                            $circ        = 2 * M_PI * 38;
-                            $off         = 0;
-                            foreach ($donutLabels as $li => $lbl):
-                                $v    = $statusHadir[$lbl] ?? 0;
-                                $dash = round(($v / $donutTotal) * $circ, 2);
-                                $gap  = round($circ - $dash, 2);
-                                $dashOffset = round($off, 2);
-                            ?>
+                            <?php foreach ($segments as $seg): ?>
                                 <circle cx="50" cy="50" r="38"
                                     fill="none"
-                                    stroke="<?= $donutColors[$li] ?>"
+                                    stroke="<?= $seg['color'] ?>"
                                     stroke-width="12"
-                                    stroke-dasharray="<?= $dash ?> <?= $gap ?>"
-                                    stroke-dashoffset="-<?= $dashOffset ?>" />
-                            <?php $off += $dash;
-                            endforeach; ?>
+                                    stroke-dasharray="<?= $seg['dash'] ?> <?= $seg['gap'] ?>"
+                                    stroke-dashoffset="-<?= $seg['offset'] ?>" />
+                            <?php endforeach; ?>
                             <text x="50" y="54" text-anchor="middle"
                                 style="transform:rotate(90deg);transform-origin:center;font-size:18px;font-weight:800;fill:#1e2b3c">
                                 <?= $hadirHariIni ?>
@@ -187,10 +187,8 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
 
 </div>
 
-<!-- Bottom Row: Absensi Terbaru + Task Terbaru -->
 <div class="row g-4">
 
-    <!-- Absensi Terbaru -->
     <div class="col-lg-6">
         <div class="so-card">
             <div class="so-card-header">
@@ -219,9 +217,11 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
                                     'hadir' => 'Hadir',
                                     'telat' => 'Telat',
                                     'izin'  => 'Izin',
+                                    'sakit' => 'Sakit',
                                     'alpha' => 'Alpha',
                                     default => ucfirst($st)
                                 };
+                                $statusTidakMasuk = in_array($st, ['izin', 'sakit', 'alpha']);
                             ?>
                                 <tr>
                                     <td>
@@ -233,8 +233,16 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
                                             </div>
                                         </div>
                                     </td>
-                                    <td style="font-size:13px;font-weight:600"><?= $a['jam_masuk'] ? date('H:i', strtotime($a['jam_masuk'])) : '-' ?></td>
-                                    <td><span class="so-badge <?= $st ?>"><?= $stLabel ?></span></td>
+                                    <td style="font-size:13px;font-weight:600">
+                                        <?php if ($statusTidakMasuk): ?>
+                                            <span style="color:var(--text-muted);font-style:italic;">—</span>
+                                        <?php else: ?>
+                                            <?= $a['jam_masuk'] ? date('H:i', strtotime($a['jam_masuk'])) : '-' ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="so-badge <?= $st ?>"><?= $stLabel ?></span>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -244,7 +252,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         </div>
     </div>
 
-    <!-- Task Terbaru -->
     <div class="col-lg-6">
         <div class="so-card">
             <div class="so-card-header">
@@ -300,7 +307,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
 </div>
 
 <style>
-    /* ── Typography ── */
     .page-heading {
         font-size: 22px;
         font-weight: 800;
@@ -327,7 +333,6 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         font-size: 13px;
     }
 
-    /* ── Bar Chart ── */
     .dash-barchart {
         display: flex;
         align-items: flex-end;
@@ -376,16 +381,13 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         line-height: 1;
     }
 
-    /* ── Donut Chart ── */
     .dash-donut-wrap {
         display: flex;
         align-items: center;
         gap: 24px;
     }
 
-    .dash-donut-svg {
-        flex-shrink: 0;
-    }
+    .dash-donut-svg { flex-shrink: 0; }
 
     .dash-donut-legend {
         display: flex;
@@ -407,16 +409,9 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         flex-shrink: 0;
     }
 
-    .dash-legend-name {
-        color: var(--text);
-    }
+    .dash-legend-name { color: var(--text); }
+    .dash-legend-val  { color: #6b7280; font-weight: 600; }
 
-    .dash-legend-val {
-        color: #6b7280;
-        font-weight: 600;
-    }
-
-    /* ── Table Avatar ── */
     .table-avatar {
         width: 32px;
         height: 32px;
@@ -429,6 +424,12 @@ $taskSubText  = $taskAktif > 10 ? $taskAktif . ' mendekati deadline' : 'Normal';
         font-weight: 700;
         color: white;
         flex-shrink: 0;
+    }
+
+    .so-badge.sakit {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
     }
 </style>
 

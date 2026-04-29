@@ -11,7 +11,6 @@
     else                        $greet = 'Selamat Malam';
 ?>
 
-<!-- PAGE HEADER -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px;">
     <div>
         <h4 style="font-weight:800;color:var(--text);margin-bottom:4px;">
@@ -22,7 +21,6 @@
         </div>
     </div>
 
-    <!-- LIVE CLOCK -->
     <div style="background:white;border:1px solid var(--border);border-radius:14px;padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-card);">
         <div style="width:40px;height:40px;border-radius:10px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;">
             <span class="material-icons-round" style="color:var(--primary);font-size:20px;">schedule</span>
@@ -34,7 +32,6 @@
     </div>
 </div>
 
-<!-- FLASH MESSAGES -->
 <?php if (session()->getFlashdata('success')): ?>
     <div class="so-alert success" style="margin-bottom:24px;">
         <span class="material-icons-round">check_circle_outline</span>
@@ -42,10 +39,9 @@
     </div>
 <?php endif; ?>
 
-<!-- STAT CARDS -->
 <div class="row g-3 mb-4">
 
-    <!-- Absensi Hari Ini -->
+    <!-- absensi harian -->
     <div class="col-6 col-lg-3">
         <div class="stat-card <?= $absenHariIni ? 'success' : 'warning' ?>">
             <div class="stat-card-icon <?= $absenHariIni ? 'success' : 'warning' ?>">
@@ -76,7 +72,7 @@
         </div>
     </div>
 
-    <!-- Status Kehadiran -->
+    <!-- status kehadiran -->
     <div class="col-6 col-lg-3">
         <div class="stat-card primary">
             <div class="stat-card-icon primary">
@@ -108,7 +104,7 @@
         </div>
     </div>
 
-    <!-- Task Aktif -->
+    <!-- task aktif -->
     <div class="col-6 col-lg-3">
         <div class="stat-card accent">
             <div class="stat-card-icon accent">
@@ -122,7 +118,7 @@
         </div>
     </div>
 
-    <!-- Notifikasi Belum Dibaca -->
+    <!-- unread notif -->
     <div class="col-6 col-lg-3">
         <div class="stat-card warning">
             <div class="stat-card-icon warning">
@@ -138,7 +134,6 @@
 
 </div>
 
-<!-- MAIN CONTENT ROW -->
 <div class="row g-3">
 
     <!-- ABSENSI CEPAT -->

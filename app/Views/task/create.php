@@ -1,20 +1,17 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- HEADER -->
 <div class="mb-4">
     <h4 style="font-weight:800;margin-bottom:4px;">Buat Task Baru</h4>
     <div style="font-size:13px;color:var(--text-muted);">Isi detail tugas untuk tim kamu</div>
 </div>
 
-<!-- ERROR -->
 <?php if (session()->getFlashdata('error')): ?>
 <div class="so-alert error mb-3"><?= esc(session()->getFlashdata('error')) ?></div>
 <?php endif; ?>
 
 <div class="row g-4">
 
-<!-- FORM -->
 <div class="col-lg-7">
 <div class="so-card">
 <div class="so-card-body">
@@ -185,7 +182,6 @@ function updatePreview() {
     }
 
     if (date) {
-        // Format tanggal Indonesia
         const d    = new Date(date + 'T' + (time || '00:00'));
         const days = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
         const mons = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];

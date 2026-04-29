@@ -24,20 +24,25 @@ $totalKerja = '-';
 $sekarang   = time();
 $batas      = null;
 
-// Cek apakah status absensi adalah izin/sakit/pending
-$statusIzin      = in_array($absenHariIni['status'] ?? '', ['izin', 'alpha']);
-$approvalPending = ($absenHariIni['approval_status'] ?? '') === 'pending';
-$isAbsenNormal   = $absenHariIni && !$statusIzin && !$approvalPending;
+// FIX: tambah 'sakit' ke status yang dianggap bukan absen normal
+$statusTidakMasuk = in_array($absenHariIni['status'] ?? '', ['izin', 'sakit', 'alpha']);
+$approvalPending  = ($absenHariIni['approval_status'] ?? '') === 'pending';
+$isAbsenNormal    = $absenHariIni && !$statusTidakMasuk && !$approvalPending;
 
 if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
     $tsMasuk         = strtotime($absenHariIni['jam_masuk']);
     $totalDetik      = $sekarang - $tsMasuk;
     $totalBreakDetik = ($totalBreakMnt ?? 0) * 60;
     $kerjaBersih     = max(0, $totalDetik - $totalBreakDetik);
-    $jam             = floor($kerjaBersih / 3600);
-    $mnt             = floor(($kerjaBersih % 3600) / 60);
-    $totalKerja      = $jam . 'j ' . $mnt . 'm';
+    $jamKerja        = floor($kerjaBersih / 3600);
+    $mntKerja        = floor(($kerjaBersih % 3600) / 60);
+    $totalKerja      = $jamKerja . 'j ' . $mntKerja . 'm';
     $batas           = $tsMasuk + (8 * 3600);
+}
+
+// FIX: overtime hanya relevan jika absen normal, bukan izin/sakit/alpha
+if ($statusTidakMasuk || $approvalPending) {
+    $overtime = false;
 }
 ?>
 
@@ -60,23 +65,48 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
 </div>
 
 <!-- Work Status Banner -->
-<div class="work-status-banner mb-4 <?= $absenHariIni ? ($isBreak ? 'break' : ($overtime ? 'overtime' : ($statusIzin || $approvalPending ? 'absent' : 'working'))) : 'absent' ?>">
+<?php
+// FIX: tentukan kelas banner berdasarkan status yang lengkap
+if (!$absenHariIni) {
+    $bannerClass = 'absent';
+} elseif ($statusTidakMasuk || $approvalPending) {
+    $bannerClass = 'off'; // kelas baru untuk izin/sakit/alpha
+} elseif ($isBreak) {
+    $bannerClass = 'break';
+} elseif ($overtime) {
+    $bannerClass = 'overtime';
+} else {
+    $bannerClass = 'working';
+}
+
+// Label & icon untuk status tidak masuk
+$statusLabel = [
+    'izin'  => ['label' => '📅 Kamu sedang izin hari ini', 'icon' => 'event_busy'],
+    'sakit' => ['label' => '🏥 Kamu sedang sakit hari ini', 'icon' => 'local_hospital'],
+    'alpha' => ['label' => '❌ Kamu tidak hadir hari ini', 'icon' => 'person_off'],
+];
+?>
+<div class="work-status-banner mb-4 <?= $bannerClass ?>">
     <div class="d-flex align-items-center gap-3">
         <div class="work-status-dot"></div>
         <div>
             <div class="work-status-label">
                 <?php if (!$absenHariIni): ?>
                     Belum absen masuk hari ini
-                <?php elseif ($statusIzin || $approvalPending): ?>
-                    📌 <?= $approvalPending ? 'Menunggu persetujuan izin' : ucfirst($absenHariIni['status']) ?>
+                <?php elseif ($statusTidakMasuk || $approvalPending): ?>
+                    <?= $statusLabel[$absenHariIni['status']]['label'] ?? ('📌 ' . ucfirst($absenHariIni['status'])) ?>
                 <?php elseif ($overtime): ?>
                     ⚠️ Overtime — kamu sudah melebihi jam kerja
                 <?php else: ?>
                     Terkini
                 <?php endif; ?>
             </div>
-            <?php if ($absenHariIni && $jamMasuk): ?>
+            <?php if ($absenHariIni && $jamMasuk && !$statusTidakMasuk): ?>
                 <div style="font-size:12px;opacity:.75;">Absen masuk pukul <?= $jamMasuk ?></div>
+            <?php elseif ($absenHariIni && ($statusTidakMasuk || $approvalPending)): ?>
+                <div style="font-size:12px;opacity:.75;">
+                    <?= $approvalPending ? 'Menunggu persetujuan dari admin' : 'Pengajuan sudah disetujui' ?>
+                </div>
             <?php endif; ?>
         </div>
     </div>
@@ -91,8 +121,17 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
                 <span class="material-icons-round">schedule</span>
             </div>
             <div class="stat-card-label">Total Kerja Hari Ini</div>
-            <div class="stat-card-value"><?= $absenHariIni ? $totalKerja : '-' ?></div>
-            <div class="stat-card-sub"><?= $absenHariIni ? 'Mulai ' . $jamMasuk : 'Belum absen' ?></div>
+            <!-- FIX: tampilkan '-' kalau sedang izin/sakit/alpha -->
+            <div class="stat-card-value"><?= $isAbsenNormal ? $totalKerja : '-' ?></div>
+            <div class="stat-card-sub">
+                <?php if ($isAbsenNormal): ?>
+                    Mulai <?= $jamMasuk ?>
+                <?php elseif ($statusTidakMasuk): ?>
+                    <?= ucfirst($absenHariIni['status'] ?? '') ?> hari ini
+                <?php else: ?>
+                    Belum absen
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -138,7 +177,7 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
     </div>
 </div>
 
-<!-- Overtime Card -->
+<!-- Overtime Card — FIX: hanya tampil kalau isAbsenNormal -->
 <?php if ($isAbsenNormal && $batas && !$absenHariIni['jam_keluar']): ?>
     <?php
     $masuk  = strtotime($absenHariIni['jam_masuk']);
@@ -216,7 +255,31 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
             <div class="so-card-body">
                 <div class="timeline-list">
 
-                    <?php if ($absenHariIni): ?>
+                    <?php if ($absenHariIni && $statusTidakMasuk): ?>
+                        <!-- FIX: Timeline khusus untuk izin/sakit/alpha -->
+                        <div class="timeline-item">
+                            <div class="timeline-icon <?= $absenHariIni['status'] === 'sakit' ? 'warning-icon' : 'danger-icon' ?>">
+                                <span class="material-icons-round">
+                                    <?php
+                                        echo match($absenHariIni['status']) {
+                                            'sakit' => 'local_hospital',
+                                            'izin'  => 'event_busy',
+                                            default => 'person_off',
+                                        };
+                                    ?>
+                                </span>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">
+                                    <?= ucfirst($absenHariIni['status']) ?> hari ini
+                                </div>
+                                <div class="timeline-sub">
+                                    <?= $approvalPending ? 'Menunggu persetujuan admin' : 'Sudah disetujui' ?>
+                                </div>
+                            </div>
+                        </div>
+
+                    <?php elseif ($absenHariIni): ?>
                         <div class="timeline-item">
                             <div class="timeline-icon success-icon"><span class="material-icons-round">check</span></div>
                             <div class="timeline-content">
@@ -226,54 +289,60 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
                         </div>
                     <?php endif; ?>
 
-                    <?php foreach ($breakLogs as $bl): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-icon warning-icon"><span class="material-icons-round">free_breakfast</span></div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Break <?= $bl['durasi'] ?? '?' ?> menit</div>
-                                <div class="timeline-sub">
-                                    <?= date('H:i', strtotime($bl['mulai'])) ?> —
-                                    <?= $bl['selesai'] ? date('H:i', strtotime($bl['selesai'])) : 'sedang berlangsung' ?>
+                    <?php if (!$statusTidakMasuk): ?>
+
+                        <?php foreach ($breakLogs as $bl): ?>
+                            <div class="timeline-item">
+                                <div class="timeline-icon warning-icon"><span class="material-icons-round">free_breakfast</span></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-title">Break <?= $bl['durasi'] ?? '?' ?> menit</div>
+                                    <div class="timeline-sub">
+                                        <?= date('H:i', strtotime($bl['mulai'])) ?> —
+                                        <?= $bl['selesai'] ? date('H:i', strtotime($bl['selesai'])) : 'sedang berlangsung' ?>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
 
-                    <?php foreach ($idleLogs as $il): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-icon danger-icon"><span class="material-icons-round">warning_amber</span></div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Idle terdeteksi</div>
-                                <div class="timeline-sub"><?= date('H:i', strtotime($il['mulai'])) ?> — selama <?= $il['durasi'] ?? '?' ?> menit</div>
+                        <?php foreach ($idleLogs as $il): ?>
+                            <div class="timeline-item">
+                                <div class="timeline-icon danger-icon"><span class="material-icons-round">warning_amber</span></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-title">Idle terdeteksi</div>
+                                    <div class="timeline-sub"><?= date('H:i', strtotime($il['mulai'])) ?> — selama <?= $il['durasi'] ?? '?' ?> menit</div>
+                                </div>
                             </div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
 
-                    <?php if ($absenHariIni && $overtime && !$absenHariIni['jam_keluar']): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-icon danger-icon" style="animation:pulse 2s infinite;"><span class="material-icons-round">warning</span></div>
-                            <div class="timeline-content">
-                                <div class="timeline-title" style="color:var(--danger);">Overtime berlangsung</div>
-                                <div class="timeline-sub">Sudah melewati jam kerja normal</div>
+                        <?php if ($absenHariIni && $overtime && !$absenHariIni['jam_keluar']): ?>
+                            <div class="timeline-item">
+                                <div class="timeline-icon danger-icon" style="animation:pulse 2s infinite;"><span class="material-icons-round">warning</span></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-title" style="color:var(--danger);">Overtime berlangsung</div>
+                                    <div class="timeline-sub">Sudah melewahi jam kerja normal</div>
+                                </div>
                             </div>
-                        </div>
-                    <?php elseif ($absenHariIni && !$absenHariIni['jam_keluar']): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-icon active-icon" style="animation:pulse 2s infinite;"><span class="material-icons-round">work</span></div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Sedang bekerja...</div>
-                                <div class="timeline-sub">Sekarang</div>
+                        <?php elseif ($absenHariIni && !$absenHariIni['jam_keluar']): ?>
+                            <div class="timeline-item">
+                                <div class="timeline-icon active-icon" style="animation:pulse 2s infinite;"><span class="material-icons-round">work</span></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-title">Sedang bekerja...</div>
+                                    <div class="timeline-sub">Sekarang</div>
+                                </div>
                             </div>
-                        </div>
-                    <?php elseif ($absenHariIni && $absenHariIni['jam_keluar']): ?>
-                        <div class="timeline-item">
-                            <div class="timeline-icon"><span class="material-icons-round">logout</span></div>
-                            <div class="timeline-content">
-                                <div class="timeline-title">Absen pulang</div>
-                                <div class="timeline-sub"><?= date('H:i', strtotime($absenHariIni['jam_keluar'])) ?></div>
+                        <?php elseif ($absenHariIni && $absenHariIni['jam_keluar']): ?>
+                            <div class="timeline-item">
+                                <div class="timeline-icon"><span class="material-icons-round">logout</span></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-title">Absen pulang</div>
+                                    <div class="timeline-sub"><?= date('H:i', strtotime($absenHariIni['jam_keluar'])) ?></div>
+                                </div>
                             </div>
-                        </div>
-                    <?php else: ?>
+                        <?php endif; ?>
+
+                    <?php endif; // end bukan statusTidakMasuk ?>
+
+                    <?php if (!$absenHariIni): ?>
                         <div style="text-align:center;padding:24px 0;color:var(--text-muted);font-size:13px;">
                             <span class="material-icons-round" style="display:block;font-size:32px;margin-bottom:8px;color:var(--border);">calendar_today</span>
                             Belum ada aktivitas hari ini
@@ -303,16 +372,16 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
                     <div class="task-list-scroll">
                         <?php foreach (array_slice($tasks, 0, 6) as $task):
                             $tc = match ($task['status']) {
-                                'todo' => 'todo',
+                                'todo'        => 'todo',
                                 'on_progress' => 'in-progress',
-                                'done' => 'done',
-                                default => 'todo'
+                                'done'        => 'done',
+                                default       => 'todo'
                             };
                             $tl = match ($task['status']) {
-                                'todo' => 'Todo',
+                                'todo'        => 'Todo',
                                 'on_progress' => 'On progress',
-                                'done' => 'Selesai',
-                                default => ''
+                                'done'        => 'Selesai',
+                                default       => ''
                             };
                             $tdOverdue = $task['deadline'] && $task['status'] !== 'done' && strtotime($task['deadline']) < time();
                             $tdLabel   = '';
@@ -365,8 +434,8 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
     </div>
 </div>
 
-<!-- Overtime Alert Modal -->
-<?php if ($overtime): ?>
+<!-- Overtime Alert Modal — FIX: hanya muncul kalau isAbsenNormal -->
+<?php if ($isAbsenNormal && $overtime): ?>
     <div id="overtimeModal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;">
         <div style="background:white;border-radius:16px;padding:32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2);">
             <div style="width:56px;height:56px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
@@ -450,6 +519,12 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         border-color: var(--primary);
     }
 
+    /* FIX: kelas baru untuk status izin/sakit/alpha */
+    .work-status-banner.off {
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+        border-color: #d1d5db;
+    }
+
     .work-status-dot {
         width: 10px;
         height: 10px;
@@ -458,21 +533,11 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         animation: pulse 2s infinite;
     }
 
-    .work-status-banner.working .work-status-dot {
-        color: #10b981;
-    }
-
-    .work-status-banner.break .work-status-dot {
-        color: #f59e0b;
-    }
-
-    .work-status-banner.overtime .work-status-dot {
-        color: #ef4444;
-    }
-
-    .work-status-banner.absent .work-status-dot {
-        color: var(--primary);
-    }
+    .work-status-banner.working .work-status-dot { color: #10b981; }
+    .work-status-banner.break .work-status-dot   { color: #f59e0b; }
+    .work-status-banner.overtime .work-status-dot{ color: #ef4444; }
+    .work-status-banner.absent .work-status-dot  { color: var(--primary); }
+    .work-status-banner.off .work-status-dot     { color: #9ca3af; }
 
     .work-status-label {
         font-size: 14px;
@@ -514,15 +579,8 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         flex-shrink: 0;
     }
 
-    .ot-normal .ot-icon {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-
-    .ot-active .ot-icon {
-        background: #fecaca;
-        color: #dc2626;
-    }
+    .ot-normal .ot-icon { background: #dbeafe; color: #1d4ed8; }
+    .ot-active .ot-icon { background: #fecaca; color: #dc2626; }
 
     .ot-label {
         font-size: 15px;
@@ -557,15 +615,8 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
     }
 
     @keyframes pulse-border {
-
-        0%,
-        100% {
-            box-shadow: 0 0 0 0 rgba(239, 68, 68, .3);
-        }
-
-        50% {
-            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
-        }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .3); }
+        50%       { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
     }
 
     .timeline-list {
@@ -604,29 +655,12 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         flex-shrink: 0;
     }
 
-    .timeline-icon .material-icons-round {
-        font-size: 16px;
-    }
+    .timeline-icon .material-icons-round { font-size: 16px; }
 
-    .success-icon {
-        background: #d1fae5;
-        color: #059669;
-    }
-
-    .warning-icon {
-        background: #fef3c7;
-        color: #d97706;
-    }
-
-    .danger-icon {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-
-    .active-icon {
-        background: var(--primary-light);
-        color: var(--primary);
-    }
+    .success-icon { background: #d1fae5; color: #059669; }
+    .warning-icon { background: #fef3c7; color: #d97706; }
+    .danger-icon  { background: #fee2e2; color: #dc2626; }
+    .active-icon  { background: var(--primary-light); color: var(--primary); }
 
     .timeline-title {
         font-size: 13px;
@@ -651,9 +685,7 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         border-bottom: 1px solid var(--border);
     }
 
-    .dash-task-item:last-child {
-        border-bottom: none;
-    }
+    .dash-task-item:last-child { border-bottom: none; }
 
     .dash-task-check {
         width: 20px;
@@ -705,72 +737,31 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         cursor: pointer;
     }
 
-    .so-toast.success {
-        background: linear-gradient(135deg, #059669, #10b981);
-    }
+    .so-toast.success { background: linear-gradient(135deg, #059669, #10b981); }
+    .so-toast.error   { background: linear-gradient(135deg, #dc2626, #ef4444); }
+    .so-toast.warning { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .so-toast.info    { background: linear-gradient(135deg, #2563eb, #3b82f6); }
 
-    .so-toast.error {
-        background: linear-gradient(135deg, #dc2626, #ef4444);
-    }
+    .so-toast.fade-out { animation: toastOut .3s ease forwards; }
 
-    .so-toast.warning {
-        background: linear-gradient(135deg, #d97706, #f59e0b);
-    }
-
-    .so-toast.info {
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
-    }
-
-    .so-toast.fade-out {
-        animation: toastOut .3s ease forwards;
-    }
-
-    @keyframes toastIn {
-        from {
-            opacity: 0;
-            transform: translateX(40px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    @keyframes toastOut {
-        from {
-            opacity: 1;
-            transform: translateX(0);
-        }
-
-        to {
-            opacity: 0;
-            transform: translateX(40px);
-        }
-    }
+    @keyframes toastIn  { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+    @keyframes toastOut { from { opacity:1; transform:translateX(0); }   to { opacity:0; transform:translateX(40px); } }
 </style>
 
 <script>
     // ── Toast ────────────────────────────────────────
     function showToast(message, type = 'info', duration = 3500) {
         const container = document.getElementById('toast-container');
-        const icons = {
-            success: 'check_circle',
-            error: 'error',
-            warning: 'warning_amber',
-            info: 'info'
-        };
-
+        const icons = { success: 'check_circle', error: 'error', warning: 'warning_amber', info: 'info' };
         const toast = document.createElement('div');
         toast.className = `so-toast ${type}`;
         toast.innerHTML = `
-        <span class="material-icons-round" style="font-size:20px;flex-shrink:0;">${icons[type] ?? 'info'}</span>
-        <span style="flex:1;line-height:1.4;">${message}</span>
-        <span class="material-icons-round" style="font-size:16px;opacity:.7;flex-shrink:0;">close</span>
-    `;
+            <span class="material-icons-round" style="font-size:20px;flex-shrink:0;">${icons[type] ?? 'info'}</span>
+            <span style="flex:1;line-height:1.4;">${message}</span>
+            <span class="material-icons-round" style="font-size:16px;opacity:.7;flex-shrink:0;">close</span>
+        `;
         toast.onclick = () => dismissToast(toast);
         container.appendChild(toast);
-
         setTimeout(() => dismissToast(toast), duration);
     }
 
@@ -795,10 +786,7 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
         const fd = new FormData();
         fd.append('status', newStatus);
         fd.append('<?= csrf_token() ?>', '<?= csrf_hash() ?>');
-        fetch(`/task/update-status/${taskId}`, {
-                method: 'POST',
-                body: fd
-            })
+        fetch(`/task/update-status/${taskId}`, { method: 'POST', body: fd })
             .then(r => r.json())
             .then(d => {
                 if (d.status) {
@@ -817,18 +805,16 @@ if ($isAbsenNormal && !empty($absenHariIni['jam_masuk'])) {
     // ── Absen Pulang ─────────────────────────────────
     function doAbsenPulang() {
         fetch('/absen-pulang', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: ''
-            })
-            .then(r => r.json())
-            .then(d => {
-                showToast(d.message, d.status ? 'success' : 'error');
-                if (d.status) setTimeout(() => location.reload(), 2000);
-            })
-            .catch(() => showToast('Gagal terhubung ke server.', 'error'));
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: ''
+        })
+        .then(r => r.json())
+        .then(d => {
+            showToast(d.message, d.status ? 'success' : 'error');
+            if (d.status) setTimeout(() => location.reload(), 2000);
+        })
+        .catch(() => showToast('Gagal terhubung ke server.', 'error'));
     }
 </script>
 

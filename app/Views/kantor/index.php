@@ -1,7 +1,6 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- PAGE HEADER -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px;">
     <div>
         <h4 style="font-weight:800;color:var(--text);margin-bottom:4px;">Konfigurasi Kantor</h4>
@@ -13,7 +12,6 @@
     </div>
 </div>
 
-<!-- FLASH -->
 <?php if (session()->getFlashdata('success')): ?>
     <div class="so-alert success"><span class="material-icons-round">check_circle_outline</span><?= esc(session()->getFlashdata('success')) ?></div>
 <?php endif; ?>
@@ -23,7 +21,6 @@
 
 <div class="row g-3">
 
-    <!-- FORM KONFIGURASI -->
     <div class="col-lg-7">
         <div class="so-card">
             <div class="so-card-header">
@@ -48,7 +45,6 @@
                                value="<?= esc($kantor['nama_kantor'] ?? '') ?>" required>
                     </div>
 
-                    <!-- Koordinat -->
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -74,7 +70,6 @@
                         </div>
                     </div>
 
-                    <!-- Tombol ambil lokasi GPS -->
                     <div style="margin-bottom:20px;margin-top:-8px;">
                         <button type="button" onclick="getMyLocation()" class="btn-so-outline" style="padding:8px 14px;font-size:13px;">
                             <span class="material-icons-round" style="font-size:16px;">gps_fixed</span>
@@ -83,7 +78,6 @@
                         <span id="gps-status" style="font-size:12px;color:var(--text-muted);margin-left:8px;"></span>
                     </div>
 
-                    <!-- Radius -->
                     <div class="form-group">
                         <label class="so-label">
                             <span class="material-icons-round" style="font-size:15px;vertical-align:middle;margin-right:4px;">radio_button_checked</span>
@@ -114,7 +108,6 @@
                         </div>
                     </div>
 
-                    <!-- Jam Kerja -->
                     <div class="row g-3">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -138,7 +131,6 @@
                         </div>
                     </div>
 
-                    <!-- Maks Break -->
                     <div class="form-group">
                         <label class="so-label">
                             <span class="material-icons-round" style="font-size:15px;vertical-align:middle;margin-right:4px;">free_breakfast</span>
@@ -165,10 +157,8 @@
         </div>
     </div>
 
-    <!-- RINGKASAN & MAP -->
     <div class="col-lg-5">
 
-        <!-- Ringkasan Saat Ini -->
         <div class="so-card" style="margin-bottom:12px;">
             <div class="so-card-header">
                 <span class="so-card-title">
@@ -241,7 +231,6 @@
             </div>
         </div>
 
-        <!-- Link Google Maps -->
         <?php if (!empty($kantor['latitude']) && !empty($kantor['longitude'])): ?>
         <div class="so-card">
             <div class="so-card-body" style="padding:16px;text-align:center;">

@@ -19,7 +19,6 @@ class BreakController extends BaseController
     {
         $userId = session()->get('user_id');
 
-        // Cek apakah sedang break
         $aktif = $this->breakModel
             ->where('user_id', $userId)
             ->where('selesai', null)
@@ -79,7 +78,6 @@ class BreakController extends BaseController
         ]);
     }
 
-    // Cek status break aktif (untuk update UI)
     public function status()
     {
         $userId = session()->get('user_id');

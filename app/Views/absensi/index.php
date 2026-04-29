@@ -22,22 +22,26 @@
 <?php endif; ?>
 
 <?php
-// Tentukan kondisi tombol di PHP agar logikanya jelas
+// Status yang mengunci tombol absen masuk/pulang
+// 'alpha' dari reject atau cron TIDAK mengunci — karyawan tetap bisa absen kalau tiba
+// yang mengunci: sudah punya record hadir, atau pengajuan izin/sakit yang masih pending/approved
 $sudahMasuk  = $absenHariIni && !empty($absenHariIni['jam_masuk']);
 $sudahPulang = $absenHariIni && !empty($absenHariIni['jam_keluar']);
-$sudahIzin   = $absenHariIni && in_array($absenHariIni['status'], ['izin', 'sakit']);
 
-// Tombol masuk: disabled kalau sudah masuk ATAU sudah izin
-$disableMasuk  = $sudahMasuk || $sudahIzin;
-// Tombol pulang: disabled kalau belum masuk, sudah pulang, atau status izin
-$disablePulang = !$sudahMasuk || $sudahPulang || $sudahIzin;
-// Tombol izin: disabled kalau sudah ada data absensi apapun hari ini
+// Izin/sakit pending atau approved → kunci tombol absen
+// Alpha (dari reject atau cron) → TIDAK kunci, biarkan karyawan absen
+$statusIzinAktif = $absenHariIni
+    && in_array($absenHariIni['status'], ['izin', 'sakit'])
+    && in_array($absenHariIni['approval_status'] ?? '', ['pending', 'approved']);
+
+$disableMasuk  = $sudahMasuk || $statusIzinAktif;
+$disablePulang = !$sudahMasuk || $sudahPulang || $statusIzinAktif;
 $disableIzin   = $absenHariIni !== null;
 ?>
 
 <div class="row g-3">
 
-    <!-- PANEL ABSENSI -->
+    <!-- absen -->
     <div class="col-lg-7">
         <div class="so-card">
             <div class="so-card-header">
@@ -49,7 +53,7 @@ $disableIzin   = $absenHariIni !== null;
             </div>
             <div class="so-card-body">
 
-                <!-- Status GPS -->
+                <!-- lokasi -->
                 <div id="location-status" style="display:flex;align-items:center;gap:10px;background:#f8faff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:20px;">
                     <span class="material-icons-round" style="font-size:20px;color:var(--text-muted);animation:spin 1s linear infinite;" id="loc-icon">location_searching</span>
                     <div>
@@ -58,7 +62,7 @@ $disableIzin   = $absenHariIni !== null;
                     </div>
                 </div>
 
-                <!-- Tombol Absen Masuk & Pulang -->
+                <!-- absen masuk & pulang -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
                     <button id="btn-masuk" class="btn-so-success"
                         onclick="doAbsen('masuk')"
@@ -68,7 +72,7 @@ $disableIzin   = $absenHariIni !== null;
                         <span>Absen Masuk</span>
                         <?php if ($sudahMasuk): ?>
                             <small style="font-size:12px;opacity:.8;">Sudah: <?= substr($absenHariIni['jam_masuk'], 0, 5) ?></small>
-                        <?php elseif ($sudahIzin): ?>
+                        <?php elseif ($statusIzinAktif): ?>
                             <small style="font-size:12px;opacity:.8;">Status: <?= ucfirst($absenHariIni['status']) ?></small>
                         <?php endif; ?>
                     </button>
@@ -85,10 +89,9 @@ $disableIzin   = $absenHariIni !== null;
                     </button>
                 </div>
 
-                <!-- Tombol Izin -->
+                <!-- izin -->
                 <div style="margin-bottom:14px;">
                     <?php if ($disableIzin): ?>
-                        <!-- Sudah ada data absensi — tampilkan info, bukan tombol aktif -->
                         <div style="width:100%;padding:12px;font-size:14px;border:1.5px solid var(--border);border-radius:12px;
                                     background:#f8faff;color:var(--text-muted);display:flex;align-items:center;
                                     justify-content:center;gap:8px;">
@@ -105,7 +108,7 @@ $disableIzin   = $absenHariIni !== null;
                     <?php endif; ?>
                 </div>
 
-                <!-- Tombol Break -->
+                <!-- break -->
                 <?php if ($sudahMasuk && !$sudahPulang): ?>
                 <div style="margin-bottom:14px;">
                     <button id="btn-break"
@@ -119,10 +122,8 @@ $disableIzin   = $absenHariIni !== null;
                 </div>
                 <?php endif; ?>
 
-                <!-- Hasil Absen -->
                 <div id="absen-result" class="so-alert d-none"></div>
 
-                <!-- Info Jarak -->
                 <div id="jarak-info" style="display:none;text-align:center;font-size:13px;color:var(--text-muted);margin-top:8px;">
                     Jarak dari kantor: <strong id="jarak-val">—</strong> meter
                 </div>
@@ -131,7 +132,7 @@ $disableIzin   = $absenHariIni !== null;
         </div>
     </div>
 
-    <!-- STATUS ABSENSI HARI INI -->
+    <!-- absen harian -->
     <div class="col-lg-5">
         <div class="so-card h-100">
             <div class="so-card-header">
@@ -144,12 +145,36 @@ $disableIzin   = $absenHariIni !== null;
 
                 <?php if ($absenHariIni): ?>
                     <?php
-                        $statusMap   = ['hadir'=>'hadir','telat'=>'telat','izin'=>'izin','sakit'=>'izin','alpha'=>'absen'];
-                        $badge       = $statusMap[$absenHariIni['status']] ?? 'todo';
-                        $statusLabel = ['hadir'=>'Hadir Hari ini','telat'=>'Terlambat','izin'=>'Izin','sakit'=>'Sakit','alpha'=>'Alpha'];
-                        $iconMap     = ['hadir'=>'check_circle','telat'=>'schedule','izin'=>'event_busy','sakit'=>'medical_services','alpha'=>'cancel'];
-                        $colorBg     = ['hadir'=>'#d1fae5','telat'=>'#fef3c7','izin'=>'#dbeafe','sakit'=>'#dbeafe','alpha'=>'#fee2e2'];
-                        $colorIcon   = ['hadir'=>'#059669','telat'=>'#d97706','izin'=>'#2563eb','sakit'=>'#2563eb','alpha'=>'#dc2626'];
+                        $st = $absenHariIni['status']; // 'hadir' | 'izin' | 'sakit' | 'alpha'
+
+                        // Badge mapping — tidak ada 'telat'
+                        $badgeMap  = ['hadir'=>'hadir','izin'=>'izin','sakit'=>'absen','alpha'=>'absen'];
+                        $badge     = $badgeMap[$st] ?? 'todo';
+
+                        $labelMap  = [
+                            'hadir' => 'Hadir Hari Ini',
+                            'izin'  => 'Izin',
+                            'sakit' => 'Sakit',
+                            'alpha' => 'Alpha',
+                        ];
+                        $iconMap   = [
+                            'hadir' => 'check_circle',
+                            'izin'  => 'event_busy',
+                            'sakit' => 'medical_services',
+                            'alpha' => 'cancel',
+                        ];
+                        $colorBg   = [
+                            'hadir' => '#d1fae5',
+                            'izin'  => '#dbeafe',
+                            'sakit' => '#fce7f3',
+                            'alpha' => '#fee2e2',
+                        ];
+                        $colorIcon = [
+                            'hadir' => '#059669',
+                            'izin'  => '#2563eb',
+                            'sakit' => '#db2777',
+                            'alpha' => '#dc2626',
+                        ];
 
                         $durasiKerja = null;
                         if (!empty($absenHariIni['jam_masuk']) && !empty($absenHariIni['jam_keluar'])) {
@@ -164,7 +189,9 @@ $disableIzin   = $absenHariIni !== null;
                         $otJam  = floor($otMnt / 60);
                         $otSisa = $otMnt % 60;
                         $otLabel = $otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m";
-                        $st = $absenHariIni['status'];
+
+                        // Info approval untuk izin/sakit
+                        $approvalStatus = $absenHariIni['approval_status'] ?? '';
                     ?>
 
                     <div style="text-align:center;padding:16px 0 20px;">
@@ -174,9 +201,33 @@ $disableIzin   = $absenHariIni !== null;
                             </span>
                         </div>
                         <div style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px;">
-                            <?= $statusLabel[$st] ?? ucfirst($st) ?>
+                            <?= $labelMap[$st] ?? ucfirst($st) ?>
                         </div>
                         <span class="so-badge <?= $badge ?>"><?= ucfirst($st) ?></span>
+
+                        <?php if (in_array($st, ['izin', 'sakit'])): ?>
+                            <?php if ($approvalStatus === 'pending'): ?>
+                                <div style="margin-top:8px;">
+                                    <span style="background:#fef3c7;color:#d97706;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">
+                                        ⏳ Menunggu persetujuan
+                                    </span>
+                                </div>
+                            <?php elseif ($approvalStatus === 'approved'): ?>
+                                <div style="margin-top:8px;">
+                                    <span style="background:#d1fae5;color:#059669;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">
+                                        ✅ Disetujui
+                                    </span>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if ($st === 'alpha'): ?>
+                            <div style="margin-top:8px;">
+                                <span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;">
+                                    ❌ Tidak hadir tanpa keterangan
+                                </span>
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <hr class="so-divider">
@@ -256,7 +307,7 @@ $disableIzin   = $absenHariIni !== null;
 
 </div>
 
-<!-- MODAL IZIN / SAKIT -->
+<!-- modal izin sakit -->
 <div id="izinModal"
     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;
            justify-content:center;align-items:center;padding:16px;">
@@ -288,7 +339,7 @@ $disableIzin   = $absenHariIni !== null;
                             <div style="font-size:13px;font-weight:700;color:var(--text);">Izin</div>
                             <div style="font-size:11px;color:var(--text-muted);">Ada keperluan</div>
                         </div>
-                        <input type="radio" name="jenis" value="izin" id="radio-izin" checked style="display:none;">
+                        <input type="radio" name="status" value="izin" id="radio-izin" checked style="display:none;">
                     </label>
                     <label id="label-sakit" onclick="selectJenis('sakit')"
                         style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:2px solid var(--border);
@@ -298,7 +349,7 @@ $disableIzin   = $absenHariIni !== null;
                             <div style="font-size:13px;font-weight:700;color:var(--text);">Sakit</div>
                             <div style="font-size:11px;color:var(--text-muted);">Tidak enak badan</div>
                         </div>
-                        <input type="radio" name="jenis" value="sakit" id="radio-sakit" style="display:none;">
+                        <input type="radio" name="status" value="sakit" id="radio-sakit" style="display:none;">
                     </label>
                 </div>
             </div>
@@ -338,7 +389,7 @@ button:disabled { opacity:.45 !important; cursor:not-allowed !important; pointer
 </style>
 
 <script>
-// ── Live clock ──────────────────────────────────
+// jam
 function updateClock() {
     const n = new Date(), p = v => String(v).padStart(2,'0');
     document.getElementById('absen-clock').textContent =
@@ -351,7 +402,7 @@ function updateClock() {
 }
 updateClock(); setInterval(updateClock, 1000);
 
-// ── GPS ─────────────────────────────────────────
+// gps
 let userLat = null, userLng = null;
 navigator.geolocation.getCurrentPosition(
     pos => {
@@ -374,7 +425,7 @@ navigator.geolocation.getCurrentPosition(
     }
 );
 
-// ── Show result banner ───────────────────────────
+// card
 function showResult(ok, msg, targetId = 'absen-result') {
     const el = document.getElementById(targetId);
     el.className = `so-alert ${ok ? 'success' : 'error'}`;
@@ -383,7 +434,7 @@ function showResult(ok, msg, targetId = 'absen-result') {
     if (ok && targetId === 'absen-result') setTimeout(() => location.reload(), 1800);
 }
 
-// ── Absen masuk / pulang ─────────────────────────
+// absen
 function doAbsen(tipe) {
     if (!userLat) { showResult(false, 'Lokasi GPS belum siap. Tunggu sebentar.'); return; }
     const url = tipe === 'masuk' ? '/absen-masuk' : '/absen-pulang';
@@ -403,7 +454,7 @@ function doAbsen(tipe) {
     .catch(() => showResult(false, 'Gagal terhubung ke server.'));
 }
 
-// ── Modal Izin ───────────────────────────────────
+// izin
 function openIzinModal() {
     document.getElementById('izinModal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -431,8 +482,8 @@ function selectJenis(val) {
 }
 
 function submitIzin() {
-    const jenis = document.querySelector('input[name="jenis"]:checked').value;
-    const ket   = document.getElementById('ket').value.trim();
+    const status = document.querySelector('input[name="status"]:checked').value;
+    const ket    = document.getElementById('ket').value.trim();
     if (!ket) { showResult(false, 'Keterangan tidak boleh kosong.', 'izin-result'); return; }
 
     const btn = document.getElementById('btn-submit-izin');
@@ -442,7 +493,7 @@ function submitIzin() {
     fetch('/absensi/izin', {
         method: 'POST',
         headers: {'Content-Type':'application/x-www-form-urlencoded'},
-        body: `jenis=${encodeURIComponent(jenis)}&keterangan=${encodeURIComponent(ket)}`
+        body: `status=${encodeURIComponent(status)}&keterangan=${encodeURIComponent(ket)}`
     })
     .then(r => r.json())
     .then(d => {
@@ -461,7 +512,7 @@ function submitIzin() {
     });
 }
 
-// ── Break ────────────────────────────────────────
+// break
 let sedangBreak = false;
 <?php if ($sudahMasuk && !$sudahPulang): ?>
 fetch('/break/status')

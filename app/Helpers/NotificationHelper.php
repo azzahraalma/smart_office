@@ -7,7 +7,7 @@ use App\Models\NotificationModel;
 class NotificationHelper
 {
     /**
-     * Kirim notifikasi ke satu atau banyak user
+     * Kirim notifikasi ke semua user
      */
     public static function send($userIds, string $judul, string $pesan, string $tipe = 'info'): void
     {
@@ -29,9 +29,6 @@ class NotificationHelper
         }
     }
 
-    /**
-     * Ambil semua user_id dengan role manager
-     */
     public static function getManagerIds(): array
     {
         $db   = \Config\Database::connect();
@@ -43,9 +40,6 @@ class NotificationHelper
         return array_column($rows, 'id');
     }
 
-    /**
-     * Ambil nama user berdasarkan ID
-     */
     public static function getUserName(int $userId): string
     {
         $db   = \Config\Database::connect();
@@ -53,9 +47,7 @@ class NotificationHelper
         return $user['nama'] ?? $user['name'] ?? ('User #' . $userId);
     }
 
-    // ─────────────────────────────────────────────
-    //  TASK
-    // ─────────────────────────────────────────────
+    //  task
 
     public static function taskBaru(int $assignedTo, string $judulTask, ?string $deadline, string $prioritas): void
     {
@@ -109,9 +101,7 @@ class NotificationHelper
         );
     }
 
-    // ─────────────────────────────────────────────
-    //  ABSENSI
-    // ─────────────────────────────────────────────
+    //  absensi
 
     public static function absenMasuk(int $userId, string $jamMasuk, string $status): void
     {
@@ -154,10 +144,7 @@ class NotificationHelper
         );
     }
 
-    /**
-     * Notifikasi overtime — dikirim ke karyawan & semua manager
-     * setelah karyawan absen pulang melebihi jam normal / 8 jam kerja
-     */
+    // overtime
     public static function overtime(int $userId, string $jamKeluar, int $overtimeMinutes): void
     {
         $nama       = self::getUserName($userId);
@@ -166,10 +153,8 @@ class NotificationHelper
         $jam = floor($overtimeMinutes / 60);
         $mnt = $overtimeMinutes % 60;
 
-        // Format durasi: "1j 30m" atau "45m"
         $durasiLabel = $jam > 0 ? "{$jam}j {$mnt}m" : "{$mnt} menit";
 
-        // Notif ke karyawan
         self::send(
             $userId,
             '⏰ Kamu Overtime Hari Ini',
@@ -178,7 +163,6 @@ class NotificationHelper
             'overtime'
         );
 
-        // Notif ke manager
         self::send(
             $managerIds,
             '⚠️ Karyawan Overtime',
@@ -188,10 +172,7 @@ class NotificationHelper
         );
     }
 
-    // ─────────────────────────────────────────────
-    //  BREAK
-    // ─────────────────────────────────────────────
-
+    //  Break
     public static function breakMulai(int $userId, string $jamMulai): void
     {
         $nama       = self::getUserName($userId);
@@ -232,10 +213,7 @@ class NotificationHelper
         );
     }
 
-    // ─────────────────────────────────────────────
-    //  IDLE
-    // ─────────────────────────────────────────────
-
+    //  idle
     public static function idleTerdeteksi(int $userId, int $durasiMenit): void
     {
         $nama       = self::getUserName($userId);
@@ -256,10 +234,7 @@ class NotificationHelper
         );
     }
 
-    // ─────────────────────────────────────────────
-    //  IZIN
-    // ─────────────────────────────────────────────
-
+    //  izin
     public static function izinRequest(int $userId, string $jenis, string $ket): void
     {
         $nama       = self::getUserName($userId);

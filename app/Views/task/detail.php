@@ -1,7 +1,6 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- HEADER -->
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
     <div>
         <h4 style="font-weight:800;">Detail Task</h4>
@@ -10,7 +9,6 @@
     <a href="/task" class="btn-so-outline">Kembali</a>
 </div>
 
-<!-- FLASH -->
 <?php if (session()->getFlashdata('success')): ?>
 <div class="so-alert success"><?= esc(session()->getFlashdata('success')) ?></div>
 <?php endif; ?>
@@ -185,7 +183,6 @@ function fileIcon(string $name): string {
 
 </div>
 
-<!-- ===================== SIDE ===================== -->
 <div class="col-lg-4">
 
 <!-- UPDATE STATUS (KARYAWAN ONLY) -->

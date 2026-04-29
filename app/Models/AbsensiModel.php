@@ -29,7 +29,6 @@ class AbsensiModel extends Model
         'approved_by',
         'approved_at',
         'approval_status',
-        'jenis',
         'is_overtime',      
         'overtime_minutes',
     ];

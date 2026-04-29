@@ -21,13 +21,13 @@ class Dashboard extends BaseController
         $notifModel   = new NotificationModel();
         $breakModel   = new BreakLogModel();
 
-        // ================= ABSEN HARI INI =================
+        // absensi
         $absenHariIni = $absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
             ->first();
 
-        // ================= BREAK =================
+        // break
         $breakLogs = $breakModel
             ->where('user_id', $userId)
             ->where('DATE(mulai)', date('Y-m-d'))
@@ -41,7 +41,7 @@ class Dashboard extends BaseController
             ->where('selesai', null)
             ->first() ? true : false;
 
-        // ================= TASK =================
+        // task
         if ($role === 'manager') {
 
             $taskAktif = $taskModel
@@ -75,18 +75,18 @@ class Dashboard extends BaseController
                 ->findAll(6);
         }
 
-        // ================= TOTAL KARYAWAN =================
+        // total kaywan
         $totalKaryawan = $userModel
             ->where('role', 'karyawan')
             ->countAllResults();
 
-        // ================= HADIR HARI INI =================
+        // absensi harian
         $hadirHariIni = $absensiModel
             ->where('tanggal', date('Y-m-d'))
             ->whereIn('status', ['hadir', 'telat'])
             ->countAllResults();
 
-        // ================= CHART 7 HARI =================
+        // absensi mingguan
         $chartHadir = [];
         for ($i = 6; $i >= 0; $i--) {
             $tanggal = date('Y-m-d', strtotime("-$i days"));
@@ -97,7 +97,7 @@ class Dashboard extends BaseController
             $chartHadir[] = $jumlah;
         }
 
-        // ================= STATUS HADIR =================
+        // status karyawan
         $statusHadir = [
             'hadir' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'hadir')->countAllResults(),
             'telat' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'telat')->countAllResults(),
@@ -106,7 +106,7 @@ class Dashboard extends BaseController
             'alpha' => $absensiModel->where('tanggal', date('Y-m-d'))->where('status', 'alpha')->countAllResults(),
         ];
 
-        // ================= ABSENSI TERBARU =================
+        // absen
         $absensiList = $absensiModel
             ->select('absensi.*, users.nama, users.role')
             ->join('users', 'users.id = absensi.user_id')
@@ -114,13 +114,13 @@ class Dashboard extends BaseController
             ->orderBy('absensi.jam_masuk', 'DESC')
             ->findAll(6);
 
-        // ================= NOTIFIKASI =================
+        // notifikasi
         $notifikasi = $notifModel
             ->where('user_id', $userId)
             ->orderBy('created_at', 'DESC')
             ->findAll(5);
 
-        // ================= PENDING IZIN (MANAGER) =================
+        // approval izin 
         $pendingIzin = [];
         if ($role === 'manager') {
             $pendingIzin = $absensiModel
@@ -131,7 +131,7 @@ class Dashboard extends BaseController
                 ->findAll();
         }
 
-        // ================= OVERTIME =================
+        // overtime
         $overtime = false;
         if ($absenHariIni && !$absenHariIni['jam_keluar']) {
             // Jangan hitung overtime kalau status izin/pending
@@ -144,7 +144,7 @@ class Dashboard extends BaseController
             }
         }
 
-        // ================= DATA FINAL =================
+        // dashboard data
         $data = [
             'absenHariIni'  => $absenHariIni,
 

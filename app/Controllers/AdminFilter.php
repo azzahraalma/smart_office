@@ -10,7 +10,6 @@ class AuthFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Kalau belum login, redirect ke halaman login
         if (!session()->get('logged_in')) {
             return redirect()->to('/login')->with('error', 'Kamu harus login terlebih dahulu.');
         }
@@ -18,6 +17,6 @@ class AuthFilter implements FilterInterface
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
-        // Tidak perlu action setelah response
+
     }
 }

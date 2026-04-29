@@ -14,7 +14,7 @@ class User extends BaseController
         $this->userModel = new UserModel();
     }
 
-    // ================= LIST USER =================
+    // list user
     public function index()
     {
         if (session()->get('role') !== 'manager') {
@@ -30,7 +30,7 @@ class User extends BaseController
         ]);
     }
 
-    // ================= EDIT =================
+    // edit user
     public function edit($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -48,7 +48,7 @@ class User extends BaseController
         ]);
     }
 
-    // ================= UPDATE =================
+    // update user
     public function update($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -68,7 +68,7 @@ class User extends BaseController
             'status' => $this->request->getPost('status'),
         ];
 
-        // password optional
+        // buat password
         if ($this->request->getPost('password')) {
             $data['password'] = password_hash(
                 $this->request->getPost('password'),
@@ -76,7 +76,7 @@ class User extends BaseController
             );
         }
 
-        // upload foto
+        // upload profil foto
         $file = $this->request->getFile('foto');
         if ($file && $file->isValid() && !$file->hasMoved()) {
             $namaFoto = $file->getRandomName();
@@ -89,7 +89,6 @@ class User extends BaseController
         return redirect()->to('/users')->with('success', 'User berhasil diupdate');
     }
 
-    // ================= TOGGLE =================
     public function toggleStatus($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -115,7 +114,7 @@ class User extends BaseController
         return redirect()->to('/users')->with('success', 'Status berhasil diubah');
     }
 
-    // ================= DELETE =================
+    // delete user
     public function delete($id)
     {
         if (session()->get('role') !== 'manager') {

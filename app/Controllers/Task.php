@@ -17,7 +17,7 @@ class Task extends BaseController
         $this->taskFileModel = new TaskFileModel();
     }
 
-    // ================= INDEX =================
+    //index
     public function index()
     {
         $role   = session()->get('role');
@@ -32,7 +32,6 @@ class Task extends BaseController
                 ->findAll();
         }
 
-        // 🔔 Cek task telat & kirim notif (sekali per task, cek via DB)
         $notifModel = new \App\Models\NotificationModel();
         foreach ($tasks as $t) {
             if (
@@ -41,7 +40,6 @@ class Task extends BaseController
                 $t['status'] !== 'done' &&
                 $t['assigned_to']
             ) {
-                // Cek apakah notif telat untuk task ini sudah pernah dikirim
                 $sudahAda = $notifModel
                     ->where('user_id', $t['assigned_to'])
                     ->like('pesan', $t['judul'])
@@ -56,7 +54,7 @@ class Task extends BaseController
 
         return view('task/index', ['tasks' => $tasks]);
     }
-    // ================= CREATE =================
+    // create
     public function create()
     {
         if (session()->get('role') !== 'manager') {
@@ -71,7 +69,7 @@ class Task extends BaseController
         return view('task/create', ['karyawan' => $karyawan]);
     }
 
-    // ================= STORE =================
+    // store
     public function store()
     {
         if (session()->get('role') !== 'manager') {
@@ -97,7 +95,6 @@ class Task extends BaseController
         $prioritas  = $this->request->getPost('prioritas');
         $assignedTo = (int) $this->request->getPost('assigned_to');
 
-        // ✅ Gabungkan date + time jadi DATETIME
         $deadlineDate = $this->request->getPost('deadline_date');
         $deadlineTime = $this->request->getPost('deadline_time') ?: '00:00';
         $deadline     = $deadlineDate ? $deadlineDate . ' ' . $deadlineTime . ':00' : null;
@@ -117,7 +114,7 @@ class Task extends BaseController
 
         return redirect()->to('/task')->with('success', 'Task berhasil dibuat');
     }
-    // ================= DETAIL =================
+    // task detail
     public function detail($id)
     {
         $task = $this->taskModel->find($id);
@@ -141,7 +138,7 @@ class Task extends BaseController
         ]);
     }
 
-    // ================= UPDATE STATUS =================
+    // task update progress
     public function updateStatus($id)
     {
         $task   = $this->taskModel->find($id);
@@ -160,13 +157,12 @@ class Task extends BaseController
 
         $this->taskModel->update($id, ['status' => $status]);
 
-        // 🔔 TRIGGER NOTIFIKASI UPDATE PROGRESS ke semua manager
         NotificationHelper::taskProgressUpdate($userId, $task['judul'], $status);
 
         return redirect()->to('/task/detail/' . $id)->with('success', 'Status berhasil diupdate');
     }
 
-    // ================= DELETE =================
+    // delete task
     public function delete($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -178,7 +174,7 @@ class Task extends BaseController
         return redirect()->to('/task')->with('success', 'Task dihapus');
     }
 
-    // ================= UPLOAD FILE (KARYAWAN) =================
+    // upload hasil task
     public function upload($id)
     {
         $task   = $this->taskModel->find($id);

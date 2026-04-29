@@ -1,7 +1,6 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('content') ?>
 
-<!-- PAGE HEADER -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px;">
     <div>
         <h4 style="font-weight:800;color:var(--text);margin-bottom:4px;">Riwayat Absensi</h4>
@@ -13,13 +12,13 @@
     </a>
 </div>
 
-<!-- RINGKASAN STATISTIK -->
+<!-- statistik -->
 <?php
-    $totalHadir    = 0; $totalTelat = 0; $totalIzin = 0; $totalSakit = 0;
+    $totalHadir    = 0; $totalAlpha = 0; $totalIzin = 0; $totalSakit = 0;
     $totalOvertime = 0; $totalOvertimeMenit = 0;
     foreach ($riwayat as $r) {
         if ($r['status'] === 'hadir')      $totalHadir++;
-        elseif ($r['status'] === 'telat')  $totalTelat++;
+        elseif ($r['status'] === 'alpha')  $totalAlpha++;
         elseif ($r['status'] === 'izin')   $totalIzin++;
         elseif ($r['status'] === 'sakit')  $totalSakit++;
         if (!empty($r['is_overtime'])) {
@@ -44,8 +43,8 @@
     <div class="col-6 col-lg-3">
         <div class="stat-card warning">
             <div class="stat-card-icon warning"><span class="material-icons-round">schedule</span></div>
-            <div class="stat-card-label">Terlambat</div>
-            <div class="stat-card-value"><?= $totalTelat ?></div>
+            <div class="stat-card-label">Alpha</div>
+            <div class="stat-card-value"><?= $totalAlpha ?></div>
             <div class="stat-card-sub">hari</div>
         </div>
     </div>
@@ -67,7 +66,7 @@
     </div>
 </div>
 
-<!-- STAT OVERTIME -->
+<!-- overtime -->
 <?php if ($totalOvertime > 0): ?>
 <div style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;border-radius:14px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
     <span class="material-icons-round" style="font-size:32px;color:#ea580c;">timer</span>
@@ -79,7 +78,7 @@
 </div>
 <?php endif; ?>
 
-<!-- TABEL RIWAYAT -->
+<!-- tabel -->
 <div class="so-card">
     <div class="so-card-header">
         <span class="so-card-title">
@@ -87,7 +86,7 @@
             Daftar Riwayat (<?= $total ?> data)
         </span>
 
-        <!-- Filter Bulan (frontend) -->
+        <!-- filyer bulan -->
         <div style="display:flex;gap:8px;align-items:center;">
             <select id="filterBulan" class="so-select" style="width:auto;font-size:13px;padding:7px 12px;" onchange="filterTable()">
                 <option value="">Semua Bulan</option>
@@ -131,7 +130,6 @@
                     $hariNama = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][date('w', strtotime($tgl))];
                     $tglFmt   = date('d M Y', strtotime($tgl));
 
-                    // Hitung durasi kerja total (termasuk overtime)
                     $durasi = '—';
                     if (!empty($r['jam_masuk']) && !empty($r['jam_keluar'])) {
                         $diff = strtotime($r['jam_keluar']) - strtotime($r['jam_masuk']);
@@ -142,14 +140,13 @@
                         }
                     }
 
-                    // Overtime
                     $isOt   = !empty($r['is_overtime']);
                     $otMnt  = (int)($r['overtime_minutes'] ?? 0);
                     $otJam  = floor($otMnt / 60);
                     $otSisa = $otMnt % 60;
                     $otLabel = $isOt ? ($otJam > 0 ? "{$otJam}j {$otSisa}m" : "{$otSisa}m") : '—';
 
-                    $badgeMap = ['hadir'=>'hadir','telat'=>'telat','izin'=>'izin','sakit'=>'absen'];
+                    $badgeMap = ['hadir'=>'hadir','alpha'=>'alpha','izin'=>'izin','sakit'=>'sakit'];
                     $badge    = $badgeMap[$r['status']] ?? 'todo';
                     $bln      = date('Y-m', strtotime($tgl));
                 ?>

@@ -14,18 +14,18 @@ class Notification extends BaseController
         $this->notifModel = new NotificationModel();
     }
 
-    // LIST NOTIFIKASI
+    // list notif
     public function index()
     {
         $userId = session()->get('user_id');
 
-        // Ambil notif khusus user + urut terbaru
+        // short
         $notifications = $this->notifModel
             ->where('user_id', $userId)
             ->orderBy('created_at', 'DESC')
             ->findAll();
 
-        // 🔥 AUTO MARK AS READ (biar titik hilang)
+        // mark all as read
         $this->notifModel
             ->where('user_id', $userId)
             ->where('is_read', 0)
@@ -37,7 +37,7 @@ class Notification extends BaseController
         ]);
     }
 
-    // MARK 1 NOTIFIKASI
+    // mark 1 as read
     public function markAsRead($id)
     {
         $this->notifModel->update($id, ['is_read' => 1]);
@@ -45,7 +45,7 @@ class Notification extends BaseController
         return redirect()->back();
     }
 
-    // MARK SEMUA NOTIFIKASI
+    // mark all as read
     public function markAll()
     {
         $userId = session()->get('user_id');
@@ -58,7 +58,7 @@ class Notification extends BaseController
         return redirect()->back();
     }
 
-    // CLEAR SEMUA NOTIFIKASI
+    // delete notif
     public function clear()
     {
         $userId = session()->get('user_id');

@@ -14,7 +14,7 @@ class Auth extends BaseController
         $this->userModel = new UserModel();
     }
 
-    // ─── LOGIN ───────────────────────────────────────────────
+    // login auth
 
     public function login()
     {
@@ -54,7 +54,7 @@ class Auth extends BaseController
             return redirect()->back()->withInput()->with('error', 'Password yang kamu masukkan salah.');
         }
 
-        // Simpan data user ke session
+        // user data to db
         session()->set([
             'user_id'   => $user['id'],
             'nama'      => $user['nama'],
@@ -67,7 +67,7 @@ class Auth extends BaseController
         return redirect()->to('/')->with('success', 'Selamat datang, ' . $user['nama'] . '!');
     }
 
-    // ─── REGISTER ────────────────────────────────────────────
+    // register
 
     public function register()
     {
@@ -124,7 +124,7 @@ class Auth extends BaseController
         return redirect()->to('/users')->with('success', 'Akun berhasil ditambahkan.');
     }
 
-    // ─── LOGOUT ──────────────────────────────────────────────
+    // logout
 
     public function logout()
     {

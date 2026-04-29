@@ -14,15 +14,47 @@ class Absensi extends BaseController
 
     const JAM_MASUK_NORMAL  = '08:00:00';
     const JAM_PULANG_NORMAL = '17:00:00';
-    const MAX_JAM_KERJA     = 8;
 
     public function __construct()
     {
         $this->kantorModel  = new KantorConfigModel();
         $this->absensiModel = new AbsensiModel();
+
+        $this->lazyAutoAlpha();
     }
 
-    // ================= INDEX =================
+    // alpha indicator
+    private function lazyAutoAlpha()
+    {
+        $userId = session()->get('user_id');
+        $role   = session()->get('role');
+        if (!$userId || $role === 'manager') return;
+
+        for ($i = 1; $i <= 7; $i++) {
+            $tgl = date('Y-m-d', strtotime("-{$i} days"));
+
+            $dayOfWeek = (int) date('N', strtotime($tgl));
+            if ($dayOfWeek >= 6) continue;
+
+            $cek = $this->absensiModel
+                ->where('user_id', $userId)
+                ->where('tanggal', $tgl)
+                ->first();
+
+            if (!$cek) {
+                $this->absensiModel->insert([
+                    'user_id'          => $userId,
+                    'tanggal'          => $tgl,
+                    'status'           => 'alpha',
+                    'approval_status'  => 'approved',
+                    'is_overtime'      => 0,
+                    'overtime_minutes' => 0,
+                ]);
+            }
+        }
+    }
+
+    // index (karyawan) 
     public function index()
     {
         $userId = session()->get('user_id');
@@ -44,7 +76,7 @@ class Absensi extends BaseController
         ]);
     }
 
-    // ================= RIWAYAT =================
+    // riwayat absen 
     public function riwayat()
     {
         $userId = session()->get('user_id');
@@ -59,7 +91,7 @@ class Absensi extends BaseController
         ]);
     }
 
-    // ================= MANAGER =================
+    // manager dashboard 
     public function manager()
     {
         if (session()->get('role') !== 'manager') {
@@ -80,18 +112,17 @@ class Absensi extends BaseController
             ->findAll();
 
         $pending = $this->absensiModel
+            ->whereIn('status', ['izin', 'sakit'])
             ->where('approval_status', 'pending')
             ->findAll();
 
-        $summary = ['hadir' => 0, 'telat' => 0, 'izin' => 0, 'sakit' => 0, 'overtime' => 0];
+        $summary = ['hadir' => 0, 'izin' => 0, 'sakit' => 0, 'alpha' => 0, 'overtime' => 0];
         foreach ($data as $d) {
-            if ($d['status'] === 'hadir')     $summary['hadir']++;
-            elseif ($d['status'] === 'telat') $summary['telat']++;
-            elseif ($d['status'] === 'izin') {
-                if (($d['jenis'] ?? '') === 'sakit') $summary['sakit']++;
-                else $summary['izin']++;
-            }
-            if (!empty($d['is_overtime'])) $summary['overtime']++;
+            if ($d['status'] === 'hadir')       $summary['hadir']++;
+            elseif ($d['status'] === 'izin')    $summary['izin']++;
+            elseif ($d['status'] === 'sakit')   $summary['sakit']++;
+            elseif ($d['status'] === 'alpha')   $summary['alpha']++;
+            if (!empty($d['is_overtime']))       $summary['overtime']++;
         }
 
         $rekapUser = [];
@@ -100,19 +131,18 @@ class Absensi extends BaseController
             if (!isset($rekapUser[$uid])) {
                 $rekapUser[$uid] = [
                     'hadir'            => 0,
-                    'telat'            => 0,
                     'izin'             => 0,
                     'sakit'            => 0,
+                    'alpha'            => 0,
                     'overtime_hari'    => 0,
                     'overtime_minutes' => 0,
                 ];
             }
-            if ($d['status'] === 'hadir')     $rekapUser[$uid]['hadir']++;
-            elseif ($d['status'] === 'telat') $rekapUser[$uid]['telat']++;
-            elseif ($d['status'] === 'izin') {
-                if (($d['jenis'] ?? '') === 'sakit') $rekapUser[$uid]['sakit']++;
-                else $rekapUser[$uid]['izin']++;
-            }
+            if ($d['status'] === 'hadir')       $rekapUser[$uid]['hadir']++;
+            elseif ($d['status'] === 'izin')    $rekapUser[$uid]['izin']++;
+            elseif ($d['status'] === 'sakit')   $rekapUser[$uid]['sakit']++;
+            elseif ($d['status'] === 'alpha')   $rekapUser[$uid]['alpha']++;
+
             if (!empty($d['is_overtime'])) {
                 $rekapUser[$uid]['overtime_hari']++;
                 $rekapUser[$uid]['overtime_minutes'] += (int)($d['overtime_minutes'] ?? 0);
@@ -124,7 +154,7 @@ class Absensi extends BaseController
             $tgl   = date('Y-m-d', strtotime("-$i days"));
             $count = 0;
             foreach ($data as $d) {
-                if ($d['tanggal'] == $tgl && in_array($d['status'], ['hadir', 'telat'])) {
+                if ($d['tanggal'] == $tgl && $d['status'] === 'hadir') {
                     $count++;
                 }
             }
@@ -142,12 +172,11 @@ class Absensi extends BaseController
         ]);
     }
 
-    // ================= ABSEN MASUK =================
+    // absen masuk 
     public function absenMasuk()
     {
         $userId = session()->get('user_id');
 
-        // ── Cek sudah absen hari ini ──────────────────────────────────────
         $cek = $this->absensiModel
             ->where('user_id', $userId)
             ->where('tanggal', date('Y-m-d'))
@@ -155,15 +184,13 @@ class Absensi extends BaseController
 
         if ($cek) return $this->res(false, 'Sudah absen masuk hari ini.');
 
-        // ── Ambil konfigurasi kantor ──────────────────────────────────────
         $kantor = $this->kantorModel->first();
 
-        // ── Validasi GPS ──────────────────────────────────────────────────
+        // Validasi lokasi
         if ($kantor && !empty($kantor['latitude']) && !empty($kantor['longitude'])) {
             $lat = (float) $this->request->getPost('latitude');
             $lng = (float) $this->request->getPost('longitude');
 
-            // Koordinat wajib dikirim dari frontend
             if (!$lat || !$lng) {
                 return $this->res(false, 'Lokasi GPS tidak terdeteksi. Aktifkan GPS dan coba lagi.');
             }
@@ -186,10 +213,10 @@ class Absensi extends BaseController
             }
         }
 
-        // ── Validasi IP ───────────────────────────────────────────────────
+        // Validasi IP
         if ($kantor && !empty($kantor['allowed_ip'])) {
-            $allowedIps  = array_map('trim', explode(',', $kantor['allowed_ip']));
-            $clientIp    = $this->request->getIPAddress();
+            $allowedIps = array_map('trim', explode(',', $kantor['allowed_ip']));
+            $clientIp   = $this->request->getIPAddress();
 
             if (!in_array($clientIp, $allowedIps)) {
                 return $this->res(false, sprintf(
@@ -199,10 +226,7 @@ class Absensi extends BaseController
             }
         }
 
-        // ── Simpan absen ──────────────────────────────────────────────────
-        $jam    = date('H:i:s');
-        $status = ($jam > self::JAM_MASUK_NORMAL) ? 'telat' : 'hadir';
-
+        $jam = date('H:i:s');
         $lat = (float) $this->request->getPost('latitude');
         $lng = (float) $this->request->getPost('longitude');
 
@@ -210,7 +234,7 @@ class Absensi extends BaseController
             'user_id'          => $userId,
             'tanggal'          => date('Y-m-d'),
             'jam_masuk'        => $jam,
-            'status'           => $status,
+            'status'           => 'hadir',
             'latitude_masuk'   => $lat ?: null,
             'longitude_masuk'  => $lng ?: null,
             'ip_masuk'         => $this->request->getIPAddress(),
@@ -219,7 +243,7 @@ class Absensi extends BaseController
             'overtime_minutes' => 0,
         ]);
 
-        NotificationHelper::absenMasuk($userId, substr($jam, 0, 5), $status);
+        NotificationHelper::absenMasuk($userId, substr($jam, 0, 5), 'hadir');
 
         $jarakInfo = isset($jarakMeter) ? round($jarakMeter) : null;
         return $this->res(true, 'Absen masuk berhasil pukul ' . substr($jam, 0, 5) . '.', [
@@ -227,7 +251,7 @@ class Absensi extends BaseController
         ]);
     }
 
-    // ================= ABSEN PULANG =================
+    // absen pulang 
     public function absenPulang()
     {
         $userId = session()->get('user_id');
@@ -241,9 +265,9 @@ class Absensi extends BaseController
         if (!empty($data['jam_keluar'])) return $this->res(false, 'Sudah absen pulang hari ini.');
         if (empty($data['jam_masuk']))   return $this->res(false, 'Data jam masuk tidak valid.');
 
-        // ── Validasi GPS (pulang) ─────────────────────────────────────────
         $kantor = $this->kantorModel->first();
 
+        // Validasi lokasi
         if ($kantor && !empty($kantor['latitude']) && !empty($kantor['longitude'])) {
             $lat = (float) $this->request->getPost('latitude');
             $lng = (float) $this->request->getPost('longitude');
@@ -270,7 +294,6 @@ class Absensi extends BaseController
             }
         }
 
-        // ── Validasi IP (pulang) ──────────────────────────────────────────
         if ($kantor && !empty($kantor['allowed_ip'])) {
             $allowedIps = array_map('trim', explode(',', $kantor['allowed_ip']));
             $clientIp   = $this->request->getIPAddress();
@@ -283,11 +306,13 @@ class Absensi extends BaseController
             }
         }
 
-        // ── Hitung overtime ───────────────────────────────────────────────
-        $jamKeluar     = date('H:i:s');
-        $tsJamMasuk    = strtotime($data['jam_masuk']);
-        $tsJamKeluar   = strtotime($jamKeluar);
-        $tsBatasNormal = $tsJamMasuk + (self::MAX_JAM_KERJA * 3600);
+        $waktuKerjaJam   = (float)($kantor['waktu_kerja_jam'] ?? 8);
+        $batasKerjaDtk   = (int)($waktuKerjaJam * 3600);
+
+        $jamKeluar       = date('H:i:s');
+        $tsJamMasuk      = strtotime($data['jam_masuk']);
+        $tsJamKeluar     = strtotime($jamKeluar);
+        $tsBatasNormal   = $tsJamMasuk + $batasKerjaDtk;
 
         $isOvertime      = false;
         $overtimeMinutes = 0;
@@ -301,12 +326,12 @@ class Absensi extends BaseController
         $lng = (float) $this->request->getPost('longitude');
 
         $this->absensiModel->update($data['id'], [
-            'jam_keluar'        => $jamKeluar,
-            'latitude_keluar'   => $lat ?: null,
-            'longitude_keluar'  => $lng ?: null,
-            'ip_keluar'         => $this->request->getIPAddress(),
-            'is_overtime'       => $isOvertime ? 1 : 0,
-            'overtime_minutes'  => $overtimeMinutes,
+            'jam_keluar'       => $jamKeluar,
+            'latitude_keluar'  => $lat ?: null,
+            'longitude_keluar' => $lng ?: null,
+            'ip_keluar'        => $this->request->getIPAddress(),
+            'is_overtime'      => $isOvertime ? 1 : 0,
+            'overtime_minutes' => $overtimeMinutes,
         ]);
 
         NotificationHelper::absenPulang($userId, substr($jamKeluar, 0, 5));
@@ -326,28 +351,45 @@ class Absensi extends BaseController
         return $this->res(true, $msg, ['jarak_meter' => $jarakInfo]);
     }
 
-    // ================= IZIN =================
+    // ajukan izin sakit
     public function izin()
     {
         $userId = session()->get('user_id');
-        $jenis  = $this->request->getPost('jenis');
+
+        $cek = $this->absensiModel
+            ->where('user_id', $userId)
+            ->where('tanggal', date('Y-m-d'))
+            ->first();
+
+        if ($cek) {
+            return $this->res(false, 'Sudah ada catatan absensi hari ini.');
+        }
+
+        $status = $this->request->getPost('status');
         $ket    = $this->request->getPost('keterangan');
+
+        if (!in_array($status, ['izin', 'sakit'])) {
+            return $this->res(false, 'Jenis pengajuan tidak valid.');
+        }
+
+        if (empty(trim($ket ?? ''))) {
+            return $this->res(false, 'Keterangan tidak boleh kosong.');
+        }
 
         $this->absensiModel->insert([
             'user_id'         => $userId,
             'tanggal'         => date('Y-m-d'),
-            'status'          => 'izin',
-            'jenis'           => $jenis,
+            'status'          => $status,
             'keterangan'      => $ket,
             'approval_status' => 'pending',
         ]);
 
-        NotificationHelper::izinRequest($userId, $jenis, $ket);
+        NotificationHelper::izinRequest($userId, $status, $ket);
 
         return $this->res(true, 'Pengajuan dikirim. Tunggu persetujuan manager.');
     }
 
-    // ================= APPROVE =================
+    // approve izin/sakit absen
     public function approve($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -365,12 +407,12 @@ class Absensi extends BaseController
             'approved_at'     => date('Y-m-d H:i:s'),
         ]);
 
-        NotificationHelper::izinApproved($data['user_id'], $data['jenis'] ?? 'izin');
+        NotificationHelper::izinApproved($data['user_id'], $data['status']);
 
         return redirect()->to('/absensi/manager')->with('success', 'Pengajuan disetujui ✅');
     }
 
-    // ================= REJECT =================
+    // reject absen
     public function reject($id)
     {
         if (session()->get('role') !== 'manager') {
@@ -382,18 +424,15 @@ class Absensi extends BaseController
             return redirect()->back()->with('error', 'Data tidak ditemukan');
         }
 
-        $this->absensiModel->update($id, [
-            'approval_status' => 'rejected',
-            'approved_by'     => session()->get('user_id'),
-            'approved_at'     => date('Y-m-d H:i:s'),
-        ]);
+        $this->absensiModel->delete($id);
 
-        NotificationHelper::izinRejected($data['user_id'], $data['jenis'] ?? 'izin');
+        NotificationHelper::izinRejected($data['user_id'], $data['status']);
 
-        return redirect()->to('/absensi/manager')->with('success', 'Pengajuan ditolak ❌');
+        return redirect()->to('/absensi/manager')->with('success', 'Pengajuan ditolak. Karyawan bisa absen atau ajukan ulang ❌');
     }
 
-    // ================= HELPERS =================
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
     private function res(bool $s, string $m, array $extra = [])
     {
         return $this->response->setJSON(array_merge([

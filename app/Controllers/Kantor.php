@@ -21,21 +21,21 @@ class Kantor extends BaseController
         return view('kantor/index', $data);
     }
 
-    // optional: buat update data kantor (biar nanti ada fitur setting)
     public function update()
     {
         $id = $this->request->getPost('id');
 
         $this->kantorModel->update($id, [
-            'nama_kantor'  => $this->request->getPost('nama_kantor'),
-            'latitude'     => $this->request->getPost('latitude'),
-            'longitude'    => $this->request->getPost('longitude'),
-            'radius_meter' => $this->request->getPost('radius_meter'),
-            'allowed_ip'   => $this->request->getPost('allowed_ip'),
-            'jam_masuk'    => $this->request->getPost('jam_masuk'),
-            'jam_keluar'   => $this->request->getPost('jam_keluar'),
+            'nama_kantor'      => $this->request->getPost('nama_kantor'),
+            'latitude'         => $this->request->getPost('latitude'),
+            'longitude'        => $this->request->getPost('longitude'),
+            'radius_meter'     => $this->request->getPost('radius_meter'),
+            'allowed_ip'       => $this->request->getPost('allowed_ip'),
+            'jam_masuk'        => $this->request->getPost('jam_masuk'),
+            'jam_keluar'       => $this->request->getPost('jam_keluar'),
+            'maks_break_menit' => $this->request->getPost('maks_break_menit') ?? 120,
         ]);
 
-        return redirect()->to('/kantor')->with('success', 'Data berhasil diupdate');
+        return redirect()->to('/kantor')->with('success', 'Konfigurasi berhasil disimpan');
     }
 }

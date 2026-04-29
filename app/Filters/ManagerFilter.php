@@ -10,7 +10,6 @@ class ManagerFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Ganti isLoggedIn → logged_in (sesuai Auth.php)
         if (!session()->get('logged_in')) {
             return redirect()->to('/login');
         }
@@ -22,6 +21,6 @@ class ManagerFilter implements FilterInterface
 
     public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
     {
-        // kosong
+    
     }
 }
